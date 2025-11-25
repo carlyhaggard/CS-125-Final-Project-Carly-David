@@ -2,6 +2,7 @@ DROP DATABASE IF EXISTS youth_group_program;
 CREATE DATABASE youth_group_program;
 
 USE youth_group_program;
+
 CREATE TABLE student(
                         Id INT PRIMARY KEY AUTO_INCREMENT,
                         FirstName VARCHAR(50) NOT NULL,
@@ -87,3 +88,5 @@ CREATE TABLE volunteer_log(
                               FOREIGN KEY (StudentID) REFERENCES student(Id),
                               FOREIGN KEY (VolunteerID) REFERENCES volunteer(Id),
                               FOREIGN KEY (EventID) REFERENCES event(Id));
+
+
