@@ -4,6 +4,9 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Database Configuration ---
 DB_USER = os.getenv("DB_USER", "root")

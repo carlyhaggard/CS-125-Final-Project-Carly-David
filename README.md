@@ -8,7 +8,7 @@ Created by Carly Haggard & David Melesse.
 
 ## Who is using this?
 - Youth pastor/ministry leader uses the system for organization.
-- Main team updates information, manages small groups, and handles events.
+- The main team updates information, manages small groups, and handles events.
 - Parents and students use the frontend to join small groups and register for events.
 - Small group leaders add meeting notes and track their group.
 
@@ -89,3 +89,23 @@ Created by Carly Haggard & David Melesse.
 - View other students’ information
 - Edit small groups or events
 - Access leader notes or attendance data
+
+## Running the Server
+- Install the dependencies using:
+  `pip install -r requirements.txt`
+- Create your `.env` file (See the environment variables section below)
+- Start the server:
+  `python YouthGroupAPI.py`
+- Test the API
+  - Use Insomnia or a browser to hit an endpoint
+
+## Environment Variables Setup
+Create a `.env` file in the root of the project with the following variables: 
+```
+DB_USER=root
+DB_PASSWORD=your_password_here 
+DB_HOST=127.0.0.1
+DB_NAME=youth_group_program
+```
+
+Make sure your `.env` file is **not committed** to Git. It should already be listed in `.gitignore`.
