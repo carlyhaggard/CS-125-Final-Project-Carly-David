@@ -3,3 +3,4 @@ fastapi~=0.121.3
 uvicorn
 mysql-connector-python~=9.5.0
 python-dotenv~=1.1.0
+redis~=5.0.1
