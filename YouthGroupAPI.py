@@ -1,33 +1,12 @@
 import mysql.connector
+from database import get_mysql_pool
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# --- Database Configuration ---
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "your_password_here")
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
-DB_NAME = os.getenv("DB_NAME", "youth_group_program")
 
 # --- Connection Pooling ---
-try:
-    db_pool = mysql.connector.pooling.MySQLConnectionPool(
-        pool_name="youth_group_pool",
-        pool_size=5,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        database=DB_NAME
-    )
-    print("Database connection pool created successfully.")
-except mysql.connector.Error as err:
-    print(f"Error creating connection pool: {err}")
-    exit()
+db_pool = get_mysql_pool()
 
 # --- FastAPI App ---
 app = FastAPI(

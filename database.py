@@ -4,7 +4,6 @@ import warnings
 from dotenv import load_dotenv
 import mysql.connector.pooling
 from pymongo import MongoClient
-from pymongo.server_api import ServerApi
 import redis
 
 load_dotenv()
@@ -45,8 +44,6 @@ db_pool = None        # MySQL connection pool
 mongo_client = None   # MongoDB client
 redis_client = None   # Redis client
 
-
-
 # MySQL pool connection
 def get_mysql_pool():
     """Initializes and returns the MySQL connection pool."""
@@ -72,7 +69,7 @@ def get_mongo_client():
     global mongo_client
     if mongo_client is None:
         try:
-            mongo_client = MongoClient(MONGODB_URI, server_api=ServerApi('1'))
+            mongo_client = MongoClient(MONGODB_URI)
             # Send a ping to confirm a successful connection
             mongo_client.admin.command('ping')
             print("Pinged your deployment. You successfully connected to MongoDB!")
@@ -80,7 +77,6 @@ def get_mongo_client():
             print(f"Error connecting to MongoDB: {e}")
             exit()
     return mongo_client
-
 
 # Redis connection
 def get_redis_client():
