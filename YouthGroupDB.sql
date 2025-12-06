@@ -89,4 +89,11 @@ CREATE TABLE volunteer_log(
                               FOREIGN KEY (VolunteerID) REFERENCES volunteer(Id),
                               FOREIGN KEY (EventID) REFERENCES event(Id));
 
+CREATE TABLE event_type (
+                            Id INT AUTO_INCREMENT PRIMARY KEY,
+                            Name VARCHAR(255) NOT NULL,
+                            Description TEXT NULL
+);
+
+
 

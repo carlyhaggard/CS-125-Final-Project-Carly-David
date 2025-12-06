@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
 from setup_redis import student_checkin_edit, get_live_attendance
+from database import get_mysql_pool, get_mongo_db
 
 # --- Connection Pooling ---
 db_pool = get_mysql_pool()
@@ -68,6 +69,17 @@ class Volunteer(BaseModel):
 # Added endpoint for Redis
 class CheckInAction(BaseModel):
     student_id: int
+
+# Added endpoint for Mongo
+
+class CustomField(BaseModel):
+    name: str
+    field_type: str  # e.g., "text", "number", "boolean"
+
+class EventTypeCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    custom_fields: List[CustomField]
 
 # --- API Endpoints ---
 
@@ -201,6 +213,61 @@ def get_event_registrations(event_id: int):
         if 'cnx' in locals() and cnx.is_connected():
             cursor.close()
             cnx.close()
+
+@app.post("/event-types")
+def create_event_type(payload: EventTypeCreate):
+    """
+    Creates a new event type:
+    - Insert base record into MySQL to get a stable Id.
+    - Store custom field schema in MongoDB keyed by that Id.
+    """
+    # 1. create base event type in MySQL
+    try:
+        cnx = db_pool.get_connection()
+        cursor = cnx.cursor()
+
+        insert_sql = """
+            INSERT INTO event_type (Name, Description)
+            VALUES (%s, %s);
+        """
+        cursor.execute(insert_sql, (payload.name, payload.description))
+        cnx.commit()
+
+        event_type_id = cursor.lastrowid
+
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error (MySQL): {err}")
+    finally:
+        if "cnx" in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+    # 2. store custom field schema in MongoDB
+    try:
+        mongo_db = get_mongo_db()
+        schema_doc = {
+            "typeId": event_type_id,
+            "name": payload.name,
+            "description": payload.description,
+            "fields": [
+                {"name": f.name, "type": f.field_type}
+                for f in payload.custom_fields
+            ],
+            "createdAt": datetime.utcnow().isoformat()
+        }
+        mongo_db.eventTypes.insert_one(schema_doc)
+    except Exception as e:
+        # If Mongo fails, you still have a valid MySQL event_type row.
+        # You could optionally roll back or mark it as having no custom schema.
+        raise HTTPException(status_code=500, detail=f"Database error (MongoDB): {e}")
+
+    return {
+        "id": event_type_id,
+        "name": payload.name,
+        "description": payload.description,
+        "custom_fields": payload.custom_fields,
+    }
+
 
 
 # === SMALL GROUP ENDPOINTS ===
