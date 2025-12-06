@@ -1,0 +1,38 @@
+version: '3.8'
+
+# This file defines your development database services.
+# It allows anyone to run MySQL and Redis without installing them manually.
+
+services:
+  # --- MySQL Database Service ---
+  db:
+    image: mysql:8.0
+    container_name: youthgroup-db
+    restart: unless-stopped
+    environment:
+      # The root password is read from the .env file for security.
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: youth_group_program
+    ports:
+      # Makes the database accessible from your local machine on the standard port.
+      - "3306:3306"
+    volumes:
+      # This persists your database data even if the container is removed.
+      - db_data:/var/lib/mysql
+      # These lines automatically run your SQL scripts the first time the container is created.
+      - ./YouthGroupDB.sql:/docker-entrypoint-initdb.d/1_schema.sql
+      - ./DBMockData.sql:/docker-entrypoint-initdb.d/2_mock_data.sql
+
+  # --- Redis Service ---
+  redis:
+    image: redis:7-alpine
+    container_name: youthgroup-redis
+    restart: unless-stopped
+    ports:
+      # Makes Redis accessible from your local machine.
+      - "6379:6379"
+
+volumes:
+  # Defines the named volume for persisting MySQL data.
+  db_data:
+    driver: local

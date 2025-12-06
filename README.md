@@ -1,111 +1,107 @@
-# CS-125-Final-Project-Carly-David
+# Youth Group Management System
 
-**CS-125 Final Project repository for a Youth Group Management System.**  
-Created by Carly Haggard & David Melesse.
+This project is a full-stack application designed to help a youth pastor or ministry leader manage students, events, small groups, and volunteers. It features a FastAPI backend and a React frontend.
 
-# TEAM SINGLE
----
-
-## Who is using this?
-- Youth pastor/ministry leader uses the system for organization.
-- The main team updates information, manages small groups, and handles events.
-- Parents and students use the frontend to join small groups and register for events.
-- Small group leaders add meeting notes and track their group.
+**Created by Carly Haggard & David Melesse.**
 
 ---
 
-## What do they want to do?
-
-### Ministry Leader
-- Keep track of students, parents/guardians, leaders, and volunteers.
-
-### Small Group Leaders
-- Add meeting notes.
-- Track who is in their group and who attends.
-
-### Main Team
-- View live event check-ins.
-- Track volunteers.
-
-### Parents/Students
-- Register for events.
-- Join a small group or sign up a student for a group.
+## Table of Contents
+- [Technology Stack](#technology-stack)
+- [Project Setup Guide](#project-setup-guide)
+  - [1. Prerequisites](#1-prerequisites)
+  - [2. Environment Setup](#2-environment-setup)
+  - [3. Running the Application](#3-running-the-application)
 
 ---
 
-## What should/shouldn't they be able to do?
+## Technology Stack
 
-### Ministry Leader
-
-#### Should
-- Add, edit, and view students, parents, leaders, and volunteers
-- Create and manage events
-- Register students for events
-- Take attendance and monitor check-ins
-- Create and manage small groups
-- View all group rosters and event rosters
-
-#### Shouldn’t
-- Add or remove system admins
-- Change past attendance records without leaving a record
+- **Backend**: FastAPI (Python)
+- **Frontend**: React (Vite)
+- **Databases**:
+  - **MySQL**: For core relational data (run via Docker).
+  - **MongoDB Atlas**: Cloud-hosted database for semi-structured data.
+  - **Redis**: For in-memory data caching (run via Docker).
+- **Containerization**: Docker Compose (for database services).
 
 ---
 
-### Small Group Leaders
+## Project Setup Guide
 
-#### Should
-- Record meeting notes and group updates
-- Track attendance for their group
-- View their group roster
+This guide provides the simplest way to get the project running using Docker for the databases.
 
-#### Shouldn’t
-- Edit/view personal student information (SSN, etc.)
-- Edit events or groups they are not assigned to
-- Access private/pastoral notes
+### 1. Prerequisites
 
----
+- **Python 3.10+** and a virtual environment tool.
+- **Node.js 18+** and npm.
+- **Docker** and **Docker Compose**.
+- A **MongoDB Atlas** account (a free M0 cluster is sufficient).
 
-### Main Team
+### 2. Environment Setup
 
-#### Should
-- See live event check-ins
-- Track volunteers
-- View rosters for events they help manage
+1.  **Clone the Repository**:
+    ```sh
+    git clone <your-repository-url>
+    cd <your-repository-name>
+    ```
 
-#### Shouldn’t
-- Edit small group notes
-- Delete or change small groups without permission
+2.  **Create and Configure the `.env` File**:
+    Create a file named `.env` in the project root. This file holds all your credentials and is safely ignored by Git.
 
----
+    Copy the following into your `.env` file and **replace all placeholder values**:
 
-### Parents/Students
+    ```env
+    # --- MongoDB Configuration ---
+    # Get this from your MongoDB Atlas "Connect" -> "Drivers" dialog
+    MONGODB_URI="mongodb+srv://<your_user>:<your_password>@<your_cluster_url>"
+    MONGODB_NAME="youthgroup"
 
-#### Should
-- Register for events
-- Join or sign a student up for a small group
-- View their own upcoming events and group info
+    # --- MySQL Configuration ---
+    # This password will be used to create the MySQL Docker container.
+    # Choose a secure password.
+    DB_PASSWORD="your_super_secret_mysql_password"
+    DB_USER="root"
+    DB_HOST="127.0.0.1" # Connect to the database on your local machine
+    DB_NAME="youth_group_program"
 
-#### Shouldn’t
-- View other students’ information
-- Edit small groups or events
-- Access leader notes or attendance data
+    # --- Redis Configuration ---
+    REDIS_URL="redis://localhost:6379"
+    ```
 
-## Running the Server
-- Install the dependencies using:
-  `pip install -r requirements.txt`
-- Create your `.env` file (See the environment variables section below)
-- Start the server:
-  `python YouthGroupAPI.py`
-- Test the API
-  - Use Insomnia or a browser to hit an endpoint
+### 3. Running the Application
 
-## Environment Variables Setup
-Create a `.env` file in the root of the project with the following variables: 
+The application is run in three parts: starting the databases, running the backend, and running the frontend.
+
+#### Part 1: Start the Database Containers
+
+In a new terminal, from the project's root directory, run:
+```sh
+docker-compose up
 ```
-DB_USER=root
-DB_PASSWORD=your_password_here 
-DB_HOST=127.0.0.1
-DB_NAME=youth_group_program
-```
+This command will start the MySQL and Redis containers. The first time you run it, it will also automatically create the `youth_group_program` database and run your SQL scripts.
 
-Make sure your `.env` file is **not committed** to Git. It should already be listed in `.gitignore`.
+Leave this terminal running.
+
+#### Part 2: Run the Backend Server
+
+1.  In a second terminal, make sure you are in the project's **root directory**.
+2.  Activate your Python virtual environment: `source venv/bin/activate`.
+3.  Install dependencies if you haven't already: `pip install -r requirements.txt`.
+4.  Start the FastAPI server:
+    ```sh
+    uvicorn YouthGroupAPI:app --reload
+    ```
+5.  The API will connect to the Docker databases and run at `http://127.0.0.1:8000`.
+
+#### Part 3: Run the Frontend Server
+
+1.  In a third terminal, navigate to the **`frontend` directory**.
+2.  Install dependencies if you haven't already: `npm install`.
+3.  Start the Vite development server:
+    ```sh
+    npm run dev
+    ```
+4.  The React application will run at `http://localhost:5173`.
+
+Your full application is now running! The backend and frontend are running locally on your machine, and they are connecting to the MySQL and Redis databases that are running inside Docker containers.

@@ -81,6 +81,11 @@ CREATE TABLE volunteer(
                           Email VARCHAR(50),
                           Phone CHAR(10) NOT NULL);
 
+CREATE TABLE event_type (
+                            Id INT AUTO_INCREMENT PRIMARY KEY,
+                            Name VARCHAR(255) NOT NULL,
+                            Description TEXT NULL);
+
 CREATE TABLE volunteer_log(
                               VolunteerID INT,
                               EventID INT,
@@ -89,11 +94,7 @@ CREATE TABLE volunteer_log(
                               FOREIGN KEY (VolunteerID) REFERENCES volunteer(Id),
                               FOREIGN KEY (EventID) REFERENCES event(Id));
 
-CREATE TABLE event_type (
-                            Id INT AUTO_INCREMENT PRIMARY KEY,
-                            Name VARCHAR(255) NOT NULL,
-                            Description TEXT NULL
-);
+
 
 
 

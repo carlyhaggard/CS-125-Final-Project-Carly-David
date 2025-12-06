@@ -5,3 +5,4 @@ mysql-connector-python~=9.5.0
 python-dotenv~=1.1.0
 redis~=5.0.1
 pymongo==4.15.5
+certifi
