@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
+from setup_redis import student_checkin_edit, get_live_attendance
 
 # --- Connection Pooling ---
 db_pool = get_mysql_pool()
@@ -63,6 +64,10 @@ class Volunteer(BaseModel):
     LastName: Optional[str]
     Email: Optional[str]
     Phone: str
+
+# Added endpoint for Redis
+class CheckInAction(BaseModel):
+    student_id: int
 
 # --- API Endpoints ---
 
@@ -306,6 +311,27 @@ def get_all_volunteers():
             cursor.close()
             cnx.close()
 
+@app.post("/redis/events/{event_id}/checkin", tags=["Redis Attendance"])
+def event_checkin(event_id: int, action: CheckInAction):
+    """API Endpoint for checking in students to an event. Created when Redis was added."""
+    try:
+        status = student_checkin_edit(event_id, action.student_id)
+
+        if status == "CHECKED IN":
+            return {"event_id": event_id, "student_id": action.student_id, "status": status, "message": "Student successfully checked IN."}
+        elif status == "CHECKED OUT":
+            return {"event_id": event_id, "student_id": action.student_id, "status": status, "message": "Student successfully checked OUT."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking in student: {e}")
+
+@app.get("/redis/events/{event_id}/attendance/status", tags=["Redis Attendance"])
+def get_event_live_status(event_id: int):
+    """API Endpoint for retrieving the current attendance status for an event. Created when Redis was added."""
+    try:
+        status_data = get_live_attendance(event_id)
+        return status_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving attendance status: {e}")
 
 if __name__ == "__main__":
     print("\n=== Youth Group Program API ===")
