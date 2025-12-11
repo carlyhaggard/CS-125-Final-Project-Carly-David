@@ -116,8 +116,9 @@ This system demonstrates a modern distributed database architecture using three 
 ---
 
 ## ER Diagram
-
-### TODO Insert ER Diagram
+The full ER diagram for the MySQL schema is stored in `ER_DIAGRAM.png` in the project root.  
+You can view it directly in the GitHub repo or open it locally with any 
+image viewer to see all tables and relationships at a glance.
 
 ---
 
@@ -184,16 +185,6 @@ query GetCompleteEvent {
 - **Type Safety**: Built-in schema validation and documentation
 - **GraphiQL Interface**: Interactive query editor at `/graphql`
 
-### Available Queries
-## TODO UPDATE QUERY LIST
-| Query | Description | Databases Used |
-|-------|-------------|----------------|
-| `students` | List all students | MySQL |
-| `student(id)` | Student with parents, events, small group | MySQL |
-| `events` | List all events | MySQL |
-| `event(id)` | Complete event with all related data | MySQL + MongoDB + Redis |
-| `eventTypes` | All event types with schemas | MongoDB |
-| `liveAttendance(eventId)` | Real-time attendance | Redis |
 
 ### Example Queries
 
