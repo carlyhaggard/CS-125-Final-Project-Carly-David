@@ -32,6 +32,7 @@ docker-compose up --build
 - [Overview](#overview)
 - [Technology Stack](#technology-stack)
 - [Database Architecture](#database-architecture)
+- [ER Diagram](#er-diagram)
 - [Key Features](#key-features)
 - [GraphQL API](#graphql-api)
 - [Frontend Application](#frontend-application)
@@ -111,6 +112,27 @@ This system demonstrates a modern distributed database architecture using three 
 1. **During Event**: Check-in/out operations update Redis instantly
 2. **Live Dashboard**: Read current state from Redis (SMEMBERS, SCARD)
 3. **After Event**: Finalize → persist to MySQL `event_attendance` → DEL Redis keys
+
+---
+
+## ER Diagram
+
+The complete Entity-Relationship diagram showing the MySQL database schema is available in **[ER_DIAGRAM.md](./ER_DIAGRAM.md)**.
+
+This diagram includes:
+- All 15 database tables and their relationships
+- Primary and foreign key constraints
+- Entity attributes and data types
+- Cardinality of all relationships (one-to-many, many-to-many)
+- Junction tables for complex relationships
+- Integration points with MongoDB and Redis
+
+**Quick Overview of Key Relationships:**
+- **Students** ↔ **Parents**: Many-to-many via `family` table
+- **Students** ↔ **Small Groups**: Many-to-many via `sign_up` table
+- **Students** ↔ **Events**: Many-to-many via `registration` table
+- **Event Types** → **Events**: One-to-many (with MongoDB schema extension)
+- **Events** → **Attendance**: One-to-many (persisted from Redis)
 
 ---
 
