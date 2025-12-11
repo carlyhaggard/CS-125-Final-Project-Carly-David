@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import EventList from './components/EventList';
 import EventDetails from './components/EventDetails';
 import CreateEventTypeForm from './components/CreateEventTypeForm';
-import CreateEventForm from './components/CreateEventForm'; // Import the new form
+import CreateEventForm from './components/CreateEventForm';
+import GraphQLDemo from './components/GraphQLDemo';
+import StudentList from './components/StudentList';
 import './App.css';
 
 const API_URL = 'http://localhost:8000';
 
 function App() {
+  const [activeTab, setActiveTab] = useState('events');
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [registrations, setRegistrations] = useState([]);
@@ -49,7 +52,6 @@ function App() {
       .catch(() => setCheckInStatus('Error during check-in.'));
   };
 
-  // This function will be called by the new form when an event is created
   const handleEventCreated = (newEvent) => {
     setEvents(prevEvents => [...prevEvents, newEvent]);
   };
@@ -57,27 +59,99 @@ function App() {
   return (
     <div className="App">
       <header>
-        <h1>Youth Group Dashboard</h1>
+        <h1>🏫 Youth Group Management System</h1>
+        <p className="header-subtitle">Multi-Database Architecture with GraphQL</p>
       </header>
+
+      {/* Navigation Tabs */}
+      <nav className="tabs">
+        <button
+          className={`tab ${activeTab === 'events' ? 'active' : ''}`}
+          onClick={() => setActiveTab('events')}
+        >
+          📅 Events & Check-In
+        </button>
+        <button
+          className={`tab ${activeTab === 'students' ? 'active' : ''}`}
+          onClick={() => setActiveTab('students')}
+        >
+          👥 Students
+        </button>
+        <button
+          className={`tab ${activeTab === 'graphql' ? 'active' : ''}`}
+          onClick={() => setActiveTab('graphql')}
+        >
+          🚀 GraphQL Demo
+        </button>
+        <button
+          className={`tab ${activeTab === 'manage' ? 'active' : ''}`}
+          onClick={() => setActiveTab('manage')}
+        >
+          ⚙️ Manage
+        </button>
+      </nav>
+
+      {/* Tab Content */}
       <main className="main-layout">
-        <div className="column">
-          <EventList
-            events={events}
-            selectedEvent={selectedEvent}
-            onEventSelect={handleEventSelect}
-          />
-          <CreateEventForm onEventCreated={handleEventCreated} />
-          <CreateEventTypeForm />
-        </div>
-        <div className="column">
-          <EventDetails
-            event={selectedEvent}
-            registrations={registrations}
-            onCheckIn={handleCheckIn}
-            checkInStatus={checkInStatus}
-          />
-        </div>
+        {activeTab === 'events' && (
+          <>
+            <div className="column">
+              <EventList
+                events={events}
+                selectedEvent={selectedEvent}
+                onEventSelect={handleEventSelect}
+              />
+            </div>
+            <div className="column">
+              <EventDetails
+                event={selectedEvent}
+                registrations={registrations}
+                onCheckIn={handleCheckIn}
+                checkInStatus={checkInStatus}
+              />
+            </div>
+          </>
+        )}
+
+        {activeTab === 'students' && (
+          <div className="column-full">
+            <StudentList />
+          </div>
+        )}
+
+        {activeTab === 'graphql' && (
+          <div className="column-full">
+            <GraphQLDemo />
+          </div>
+        )}
+
+        {activeTab === 'manage' && (
+          <>
+            <div className="column">
+              <CreateEventForm onEventCreated={handleEventCreated} />
+            </div>
+            <div className="column">
+              <CreateEventTypeForm />
+            </div>
+          </>
+        )}
       </main>
+
+      {/* Footer */}
+      <footer className="footer">
+        <p>
+          <strong>Tech Stack:</strong> React + Vite | FastAPI + GraphQL | MySQL + MongoDB + Redis
+        </p>
+        <p className="footer-links">
+          <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer">
+            REST API Docs
+          </a>
+          {' | '}
+          <a href="http://localhost:8000/graphql" target="_blank" rel="noopener noreferrer">
+            GraphiQL Interface
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }

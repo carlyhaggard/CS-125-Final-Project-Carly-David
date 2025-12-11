@@ -1,8 +1,30 @@
 # Youth Group Management System
 
-This project is a full-stack application designed to help a youth pastor or ministry leader manage students, events, small groups, and volunteers. It features a FastAPI backend with a distributed database architecture and a React frontend.
+This project is a full-stack application designed to help a youth pastor or ministry leader manage students, events, small groups, and volunteers. It features a FastAPI backend with a distributed database architecture, **GraphQL API**, and a React frontend.
 
 **Created by Carly Haggard & David Melesse.**
+
+---
+
+## 🚀 Quick Start with Docker (Recommended for Instructors)
+
+**Run the entire application with one command:**
+
+```bash
+# 1. Create .env file
+cp .env.example .env
+# Edit .env with your MongoDB Atlas URI
+
+# 2. Start everything (MySQL, Redis, Backend API, Frontend)
+docker-compose up --build
+
+# 3. Access the application:
+# - Frontend: http://localhost:5173
+# - REST API: http://localhost:8000/docs
+# - GraphQL: http://localhost:8000/graphql
+```
+
+**📖 Complete Docker setup guide:** See [`DOCKER_SETUP.md`](DOCKER_SETUP.md)
 
 ---
 
@@ -11,10 +33,10 @@ This project is a full-stack application designed to help a youth pastor or mini
 - [Technology Stack](#technology-stack)
 - [Database Architecture](#database-architecture)
 - [Key Features](#key-features)
+- [GraphQL API](#graphql-api)
 - [Project Setup Guide](#project-setup-guide)
-  - [1. Prerequisites](#1-prerequisites)
-  - [2. Environment Setup](#2-environment-setup)
-  - [3. Running the Application](#3-running-the-application)
+  - [Option 1: Docker Setup (Recommended)](#option-1-docker-setup-recommended)
+  - [Option 2: Manual Setup](#option-2-manual-setup)
 - [API Documentation](#api-documentation)
 - [Testing the Features](#testing-the-features)
 - [Troubleshooting](#troubleshooting)
@@ -32,13 +54,16 @@ This system demonstrates a modern distributed database architecture using three 
 
 ## Technology Stack
 
-- **Backend**: FastAPI (Python 3.10+)
+- **Backend**:
+  - FastAPI (Python 3.10+)
+  - **GraphQL** with Strawberry (v0.262.0)
 - **Frontend**: React with Vite
 - **Databases**:
   - **MySQL 8.0**: System of record for relational data (Docker)
   - **MongoDB Atlas**: Cloud-hosted for semi-structured event data
   - **Redis 7**: In-memory cache for real-time attendance (Docker)
 - **Containerization**: Docker Compose
+- **APIs**: REST + **GraphQL**
 
 ---
 
@@ -113,11 +138,105 @@ This system demonstrates a modern distributed database architecture using three 
 
 ---
 
+## GraphQL API
+
+### What is GraphQL?
+
+GraphQL is a query language that allows clients to request **exactly the data they need** in a **single request**. This project implements GraphQL alongside the REST API to demonstrate multi-database query orchestration.
+
+### Why GraphQL for This Project?
+
+**The Problem**: Fetching complete event data requires multiple REST calls:
+1. `GET /events/1` - Base event data (MySQL)
+2. `GET /event-types/1` - Event type schema (MongoDB)
+3. `GET /events/1/custom-fields` - Custom field values (MongoDB)
+4. `GET /events/1/registrations` - Student registrations (MySQL)
+5. `GET /redis/events/1/attendance` - Live attendance (Redis)
+
+**The GraphQL Solution**: One query fetches everything:
+
+```graphql
+query GetCompleteEvent {
+  event(id: 1) {
+    description
+    address
+    eventType { name, customFields { name, type } }
+    customData
+    registrations { student { firstName, lastName } }
+    liveAttendance { checkedInCount }
+  }
+}
+```
+
+### Key Features
+
+- **Multi-Database Queries**: Single query combines MySQL + MongoDB + Redis
+- **Flexible Data Fetching**: Clients request only the fields they need
+- **Type Safety**: Built-in schema validation and documentation
+- **GraphiQL Interface**: Interactive query editor at `/graphql`
+
+### Available Queries
+
+| Query | Description | Databases Used |
+|-------|-------------|----------------|
+| `students` | List all students | MySQL |
+| `student(id)` | Student with parents, events, small group | MySQL |
+| `events` | List all events | MySQL |
+| `event(id)` | Complete event with all related data | MySQL + MongoDB + Redis |
+| `eventTypes` | All event types with schemas | MongoDB |
+| `liveAttendance(eventId)` | Real-time attendance | Redis |
+
+### Example Queries
+
+See [`graphql/example_queries.md`](graphql/example_queries.md) for 13+ ready-to-use queries!
+
+### GraphQL Setup
+
+See [`GRAPHQL_SETUP.md`](GRAPHQL_SETUP.md) for complete setup instructions.
+
+**Quick test:**
+1. Start the API: `uvicorn YouthGroupAPI:app --reload`
+2. Open: http://localhost:8000/graphql
+3. Run query:
+```graphql
+query Test {
+  students { firstName, lastName }
+}
+```
+
+---
+
 ## Project Setup Guide
 
-This guide provides the simplest way to get the project running using Docker for the databases.
+### Option 1: Docker Setup (Recommended)
 
-### 1. Prerequisites
+**Use this method to run everything with one command.**
+
+See **[`DOCKER_SETUP.md`](DOCKER_SETUP.md)** for complete instructions.
+
+**Quick Start:**
+```bash
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Edit .env and add your MongoDB Atlas URI
+
+# 3. Start everything
+docker-compose up --build
+
+# 4. Access:
+# - Frontend: http://localhost:5173
+# - REST API: http://localhost:8000/docs
+# - GraphQL: http://localhost:8000/graphql
+```
+
+---
+
+### Option 2: Manual Setup
+
+This guide explains how to run the services manually (without Docker for the backend/frontend).
+
+#### 1. Prerequisites
 
 - **Python 3.10+** and a virtual environment tool.
 - **Node.js 18+** and npm.
@@ -231,10 +350,11 @@ Your full application is now running! The backend and frontend are running local
 ## API Documentation
 
 The API includes comprehensive endpoint documentation. Once the server is running, visit:
-- **Swagger UI**: `http://127.0.0.1:8000/docs`
-- **ReDoc**: `http://127.0.0.1:8000/redoc`
+- **Swagger UI (REST)**: `http://127.0.0.1:8000/docs`
+- **ReDoc (REST)**: `http://127.0.0.1:8000/redoc`
+- **GraphiQL (GraphQL)**: `http://127.0.0.1:8000/graphql`
 
-### Core Endpoints
+### REST Core Endpoints
 
 #### Events
 - `GET /events` - List all events
@@ -438,11 +558,20 @@ docker exec youthgroup-db mysql -uroot -p${DB_PASSWORD} \
 ├── database.py               # Database connection management
 ├── setup_mongo.py            # MongoDB operations and setup
 ├── setup_redis.py            # Redis operations and setup
+├── graphql/                  # GraphQL implementation
+│   ├── schema.py             # GraphQL types, queries, and resolvers
+│   └── example_queries.md    # 13+ example GraphQL queries
 ├── YouthGroupDB.sql          # MySQL schema definition
 ├── DBMockData.sql            # Sample data for testing
-├── docker-compose.yml        # Docker services configuration
+├── Dockerfile                # Docker image for backend API
+├── docker-compose.yml        # Docker services orchestration
+├── .dockerignore             # Docker build exclusions
 ├── requirements.txt          # Python dependencies
 ├── .env                      # Environment variables (not in git)
+├── .env.example              # Environment template
+├── README.md                 # This file
+├── DOCKER_SETUP.md           # Complete Docker setup guide
+├── GRAPHQL_SETUP.md          # GraphQL setup and usage guide
 └── frontend/                 # React application
     ├── src/
     └── package.json

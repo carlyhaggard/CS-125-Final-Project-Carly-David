@@ -1,7 +1,5 @@
-version: '3.8'
-
-# This file defines your development database services.
-# It allows anyone to run MySQL and Redis without installing them manually.
+# Complete Docker Compose setup for Youth Group Management System
+# This file orchestrates all services: MySQL, Redis, MongoDB (Atlas), Backend API, and Frontend
 
 services:
   # --- MySQL Database Service ---
@@ -10,18 +8,25 @@ services:
     container_name: youthgroup-db
     restart: unless-stopped
     environment:
-      # The root password is read from the .env file for security.
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: youth_group_program
     ports:
-      # Makes the database accessible from your local machine on the standard port.
+      # Exposed on 3307 to avoid conflicts with local MySQL
       - "3307:3306"
     volumes:
-      # This persists your database data even if the container is removed.
+      # Persist database data
       - db_data:/var/lib/mysql
-      # These lines automatically run your SQL scripts the first time the container is created.
+      # Auto-run SQL scripts on first startup
       - ./YouthGroupDB.sql:/docker-entrypoint-initdb.d/1_schema.sql
       - ./DBMockData.sql:/docker-entrypoint-initdb.d/2_mock_data.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - youthgroup-network
 
   # --- Redis Service ---
   redis:
@@ -29,10 +34,75 @@ services:
     container_name: youthgroup-redis
     restart: unless-stopped
     ports:
-      # Makes Redis accessible from your local machine.
+      # Exposed on 6380 to avoid conflicts with local Redis
       - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - youthgroup-network
 
+  # --- FastAPI Backend Service (with GraphQL) ---
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: youthgroup-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database configuration
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: youth_group_program
+      # Redis configuration (internal Docker network)
+      REDIS_URL: redis://redis:6379
+      # MongoDB configuration (MongoDB Atlas - external)
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_NAME: ${MONGODB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - youthgroup-network
+    volumes:
+      # Mount code for development (hot reload)
+      # Comment out for production
+      - .:/app
+    command: uvicorn YouthGroupAPI:app --host 0.0.0.0 --port 8000 --reload
+
+  # --- Frontend Service (React + Vite) ---
+  frontend:
+    image: node:18-alpine
+    container_name: youthgroup-frontend
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      # Mount frontend code
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - api
+    networks:
+      - youthgroup-network
+
+# --- Named Volumes ---
 volumes:
-  # Defines the named volume for persisting MySQL data.
   db_data:
     driver: local
+
+# --- Networks ---
+networks:
+  youthgroup-network:
+    driver: bridge

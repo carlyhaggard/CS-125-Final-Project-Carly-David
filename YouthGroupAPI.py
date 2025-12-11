@@ -399,3 +399,20 @@ def finalize_attendance(event_id: int):
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finalizing attendance: {e}")
+
+
+# --- GraphQL Endpoint ---
+# This section integrates GraphQL with FastAPI.
+# GraphQL will run ALONGSIDE your existing REST API.
+# Access the interactive GraphiQL interface at: http://127.0.0.1:8000/graphql
+
+from strawberry.fastapi import GraphQLRouter
+from graphql.schema import schema
+
+# Create the GraphQL router with GraphiQL enabled for testing
+# GraphiQL is an in-browser IDE for writing and testing GraphQL queries
+graphql_app = GraphQLRouter(schema, graphiql=True)
+
+# Mount the GraphQL endpoint at /graphql
+# All GraphQL queries and mutations will be sent to this endpoint
+app.include_router(graphql_app, prefix="/graphql")
