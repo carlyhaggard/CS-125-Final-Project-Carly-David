@@ -1,6 +1,6 @@
 # Docker Compose for Youth Group Management System
-# This runs MySQL and Redis databases
-# Run the API and frontend manually for easier development
+# Complete multi-container setup: MySQL, Redis, Backend API, Frontend
+# Run with: docker-compose up --build
 
 services:
   # --- MySQL Database Service ---
@@ -17,6 +17,11 @@ services:
       - db_data:/var/lib/mysql
       - ./YouthGroupDB.sql:/docker-entrypoint-initdb.d/1_schema.sql
       - ./DBMockData.sql:/docker-entrypoint-initdb.d/2_mock_data.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # --- Redis Service ---
   redis:
@@ -25,6 +30,53 @@ services:
     restart: unless-stopped
     ports:
       - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- FastAPI Backend Service ---
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: youthgroup-api
+    restart: unless-stopped
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=youth_group_program
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_NAME=${MONGODB_NAME}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/docs')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # --- React Frontend Service ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: youthgroup-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
 
 volumes:
   db_data:

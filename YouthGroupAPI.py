@@ -30,6 +30,7 @@ def check_database_tables():
             print(f"- {table[0]}")
         # Check specifically for event_type
         cursor.execute("SELECT 1 FROM event_type LIMIT 1;")
+        result = cursor.fetchall()  # Fetch the result to avoid unread result error
         print("Confirmation: 'event_type' table is accessible.")
     except mysql.connector.Error as err:
         print(f"!!! Diagnostic Error: {err}")
@@ -407,7 +408,7 @@ def finalize_attendance(event_id: int):
 # Access the interactive GraphiQL interface at: http://127.0.0.1:8000/graphql
 
 from strawberry.fastapi import GraphQLRouter
-from graphql.schema import schema
+from graphql_schema.schema import schema
 
 # Create the GraphQL router with GraphiQL enabled for testing
 # GraphiQL is an in-browser IDE for writing and testing GraphQL queries

@@ -1,4 +1,4 @@
-i cn a# Dockerfile for Youth Group Management API
+# Dockerfile for Youth Group Management API
 # This containerizes the FastAPI backend with GraphQL support
 
 FROM python:3.11-slim
