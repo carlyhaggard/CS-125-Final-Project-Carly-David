@@ -86,33 +86,41 @@ class LiveAttendance:
     students: List[AttendanceRecord]
 
 @strawberry.type
+class SmallGroup:
+    """GraphQL type for small group information."""
+    id: int
+    grade: str
+
+@strawberry.type
 class Event:
     """
-    GraphQL type representing a complete event with data from all three databases.
-
-    This is the POWER of GraphQL for your system!
-    - Base event info: MySQL
-    - Event type schema: MongoDB
-    - Custom field values: MongoDB
-    - Registrations: MySQL
-    - Live attendance: Redis
+    Complete Event type with nested field resolvers.
+    GraphQL will only call these resolvers if the client requests these fields.
     """
     id: int
     description: Optional[str]
     address: str
     type_id: Optional[int]
 
-    # Nested related data - GraphQL will resolve these on demand
-    event_type: Optional[EventType] = None
-    custom_data: Optional[strawberry.scalars.JSON] = None
-    registrations: Optional[List[Registration]] = None
-    live_attendance: Optional[LiveAttendance] = None
+    @strawberry.field
+    def event_type(self) -> Optional[EventType]:
+        """Resolve the event type from MongoDB (only if requested)."""
+        return get_event_type_resolver(self)
 
-@strawberry.type
-class SmallGroup:
-    """GraphQL type for small group information."""
-    id: int
-    grade: str
+    @strawberry.field
+    def custom_data(self) -> Optional[strawberry.scalars.JSON]:
+        """Resolve custom field data from MongoDB (only if requested)."""
+        return get_event_custom_data_resolver(self)
+
+    @strawberry.field
+    def registrations(self) -> List[Registration]:
+        """Resolve registrations from MySQL (only if requested)."""
+        return get_event_registrations_resolver(self)
+
+    @strawberry.field
+    def live_attendance(self) -> Optional[LiveAttendance]:
+        """Resolve live attendance from Redis (only if requested)."""
+        return get_event_live_attendance_resolver(self)
 
 # --- Input Types for Mutations ---
 

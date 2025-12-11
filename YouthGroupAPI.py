@@ -1453,6 +1453,18 @@ def create_event_type(payload: EventTypeCreate):
         "custom_fields": payload.custom_fields,
     }
 
+@app.get("/event-types/all-schemas", tags=["Event Types", "MongoDB"])
+def get_all_event_type_schemas_endpoint():
+    """
+    Retrieves all event type schemas from MongoDB, including their custom fields.
+    This endpoint is designed to showcase MongoDB's flexible schema.
+    """
+    try:
+        schemas = get_all_event_type_schemas()
+        return schemas
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching all event type schemas: {e}")
+
 @app.get("/event-types", tags=["Event Types"])
 def get_all_event_types():
     """
@@ -1803,3 +1815,5 @@ def get_monthly_leaderboard(month: str, limit: int = 3):
         raise HTTPException(status_code=500, detail=f"Database error (MongoDB): {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching monthly leaderboard: {e}")
+
+

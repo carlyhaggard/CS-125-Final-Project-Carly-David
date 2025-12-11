@@ -8,8 +8,7 @@ function FunFeatures() {
   const [selectedEventId, setSelectedEventId] = useState('');
   const [randomWinner, setRandomWinner] = useState(null);
   const [fullSummary, setFullSummary] = useState(null);
-  const [leaderboard, setLeaderboard] = useState(null);
-  const [leaderboardMonth, setLeaderboardMonth] = useState('2024-12');
+  const [eventTypeSchemas, setEventTypeSchemas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -82,16 +81,16 @@ function FunFeatures() {
     }
   };
 
-  const handleLeaderboard = async () => {
+  const handleFetchEventTypeSchemas = async () => {
     setLoading(true);
     setError(null);
-    setLeaderboard(null);
+    setEventTypeSchemas([]);
 
     try {
-      const response = await fetch(`${API_URL}/leaderboard/monthly?month=${leaderboardMonth}&limit=3`);
-      if (!response.ok) throw new Error('Failed to get leaderboard');
+      const response = await fetch(`${API_URL}/event-types/all-schemas`);
+      if (!response.ok) throw new Error('Failed to fetch event type schemas');
       const data = await response.json();
-      setLeaderboard(data);
+      setEventTypeSchemas(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -268,61 +267,43 @@ function FunFeatures() {
         )}
       </div>
 
-      {/* Monthly Leaderboard */}
+      {/* Event Type Schema Explorer */}
       <div className="p-5 bg-white dark:bg-gray-800 border-t dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Monthly Leaderboard</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">MongoDB collection showing top events by month</p>
-        <div className="flex flex-wrap gap-4 mb-4">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Month (YYYY-MM):</label>
-            <input
-              type="text"
-              value={leaderboardMonth}
-              onChange={(e) => setLeaderboardMonth(e.target.value)}
-              placeholder="2024-12"
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleLeaderboard}
-              disabled={loading}
-              className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Get Leaderboard
-            </button>
-          </div>
-        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Event Type Schema Explorer</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Explore event type schemas and their custom fields stored in MongoDB.
+          Create new event types via the "Manage" tab to see them appear here!
+        </p>
+        <button
+          onClick={handleFetchEventTypeSchemas}
+          disabled={loading}
+          className="text-white bg-purple-700 hover:bg-purple-800 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-purple-600 dark:hover:bg-purple-700 focus:outline-none dark:focus:ring-purple-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Loading...' : 'Fetch All Event Type Schemas'}
+        </button>
 
-        {leaderboard && (
-          <div>
-            {leaderboard.leaderboard.length > 0 ? (
-              <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                  <tr>
-                    <th scope="col" className="px-6 py-3">Rank</th>
-                    <th scope="col" className="px-6 py-3">Event Name</th>
-                    <th scope="col" className="px-6 py-3">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.leaderboard.map((entry, index) => (
-                    <tr key={entry.eventId} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">#{entry.rank}</td>
-                      <td className="px-6 py-4">{entry.eventName}</td>
-                      <td className="px-6 py-4">
-                        <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                          {entry.score}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No leaderboard data for {leaderboardMonth}</p>
-            )}
+        {eventTypeSchemas.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            {eventTypeSchemas.map(schema => (
+              <div key={schema.typeId} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{schema.name} (ID: {schema.typeId})</h4>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">{schema.description || 'No description.'}</p>
+                <p className="text-md font-medium text-gray-900 dark:text-white">Custom Fields:</p>
+                {schema.fields && schema.fields.length > 0 ? (
+                  <ul className="list-disc list-inside text-sm text-gray-700 dark:text-gray-300">
+                    {schema.fields.map((field, idx) => (
+                      <li key={idx}>{field.name} ({field.type}) {field.required ? '(Required)' : ''}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No custom fields defined.</p>
+                )}
+              </div>
+            ))}
           </div>
+        )}
+        {eventTypeSchemas.length === 0 && !loading && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">No event type schemas found. Create some in the "Manage" tab!</p>
         )}
       </div>
     </div>
