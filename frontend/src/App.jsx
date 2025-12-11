@@ -10,6 +10,7 @@ import ParentManagement from './components/ParentManagement';
 import SmallGroupManagement from './components/SmallGroupManagement';
 import LeaderManagement from './components/LeaderManagement';
 import VolunteerManagement from './components/VolunteerManagement';
+import FunFeatures from './components/FunFeatures';
 import './App.css';
 
 const API_URL = 'http://localhost:8000';
@@ -161,6 +162,12 @@ function App() {
           🤝 Volunteers
         </button>
         <button
+          className={`tab ${activeTab === 'fun' ? 'active' : ''}`}
+          onClick={() => setActiveTab('fun')}
+        >
+          🎉 Fun Features
+        </button>
+        <button
           className={`tab ${activeTab === 'graphql' ? 'active' : ''}`}
           onClick={() => setActiveTab('graphql')}
         >
@@ -225,6 +232,12 @@ function App() {
         {activeTab === 'volunteers' && (
           <div className="column-full">
             <VolunteerManagement />
+          </div>
+        )}
+
+        {activeTab === 'fun' && (
+          <div className="column-full">
+            <FunFeatures />
           </div>
         )}
 

@@ -1070,3 +1070,64 @@ select option {
   border-radius: 8px;
   border: 2px dashed rgba(255, 255, 255, 0.2);
 }
+
+/* Fun Features Styling */
+.feature-section {
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.feature-section h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+  color: #f0f0f0;
+}
+
+.feature-description {
+  color: #9ca3af;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+}
+
+.winner-display {
+  text-align: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+  border-radius: 12px;
+  border: 2px solid #10b981;
+}
+
+.summary-display {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.summary-section {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.summary-section h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.summary-content p {
+  margin: 0.75rem 0;
+  font-size: 0.95rem;
+}
+
+.summary-content strong {
+  color: #667eea;
+  margin-right: 0.5rem;
+}
+
