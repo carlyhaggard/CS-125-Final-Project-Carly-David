@@ -15,6 +15,7 @@ function App() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [checkInStatus, setCheckInStatus] = useState('');
+  const [checkedInStudents, setCheckedInStudents] = useState(new Set());
 
   const fetchEvents = () => {
     fetch(`${API_URL}/events`)
@@ -27,13 +28,28 @@ function App() {
     fetchEvents(); // Fetch events on initial load
   }, []);
 
+  const fetchLiveAttendance = (eventId) => {
+    fetch(`${API_URL}/redis/events/${eventId}/attendance`)
+      .then(response => response.json())
+      .then(data => {
+        const checkedInIds = new Set(data.students.map(s => s.student_id));
+        setCheckedInStudents(checkedInIds);
+      })
+      .catch(error => console.error('Error fetching attendance:', error));
+  };
+
   const handleEventSelect = (event) => {
     setSelectedEvent(event);
     setCheckInStatus('');
+
+    // Fetch registrations
     fetch(`${API_URL}/events/${event.Id}/registrations`)
       .then(response => response.json())
       .then(data => setRegistrations(data))
       .catch(error => console.error('Error fetching registrations:', error));
+
+    // Fetch live attendance status
+    fetchLiveAttendance(event.Id);
   };
 
   const handleCheckIn = (studentId) => {
@@ -47,13 +63,51 @@ function App() {
     })
       .then(response => response.json())
       .then(data => {
-        setCheckInStatus(`Student ${studentId} status: ${data.status}`);
+        setCheckInStatus(`${data.status}`);
+
+        // Update the checked-in status locally
+        setCheckedInStudents(prev => {
+          const newSet = new Set(prev);
+          if (data.status === 'CHECKED IN') {
+            newSet.add(studentId);
+          } else {
+            newSet.delete(studentId);
+          }
+          return newSet;
+        });
       })
       .catch(() => setCheckInStatus('Error during check-in.'));
   };
 
   const handleEventCreated = (newEvent) => {
     setEvents(prevEvents => [...prevEvents, newEvent]);
+  };
+
+  const handleEventDelete = async (eventId) => {
+    try {
+      const response = await fetch(`${API_URL}/events/${eventId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        alert(`Failed to delete event: ${err.detail}`);
+        return;
+      }
+
+      // Remove from local state
+      setEvents(prevEvents => prevEvents.filter(e => e.Id !== eventId));
+
+      // Clear selected event if it was deleted
+      if (selectedEvent?.Id === eventId) {
+        setSelectedEvent(null);
+        setRegistrations([]);
+      }
+
+      alert('Event deleted successfully!');
+    } catch (error) {
+      alert(`Error deleting event: ${error.message}`);
+    }
   };
 
   return (
@@ -100,6 +154,7 @@ function App() {
                 events={events}
                 selectedEvent={selectedEvent}
                 onEventSelect={handleEventSelect}
+                onEventDelete={handleEventDelete}
               />
             </div>
             <div className="column">
@@ -108,6 +163,7 @@ function App() {
                 registrations={registrations}
                 onCheckIn={handleCheckIn}
                 checkInStatus={checkInStatus}
+                checkedInStudents={checkedInStudents}
               />
             </div>
           </>

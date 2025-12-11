@@ -83,12 +83,17 @@ function CreateEventForm({ onEventCreated }) {
               EventID: eventId,
               StudentID: studentId
             })
+          }).then(res => {
+            if (!res.ok) {
+              throw new Error(`Failed to register student ${studentId}`);
+            }
+            return res.json();
           })
         );
 
-        await Promise.all(registrationPromises);
+        const registrationResults = await Promise.all(registrationPromises);
 
-        setStatus(`Event "${eventData.Description}" created with ${selectedStudents.length} student(s) registered!`);
+        setStatus(`Event "${eventData.Description}" created with ${registrationResults.length} student(s) registered! Go to "Events & Check-In" tab to view.`);
       } else {
         setStatus(`Event "${eventData.Description}" created successfully!`);
       }

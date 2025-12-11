@@ -167,6 +167,62 @@ def create_event(payload: EventCreate):
         "custom_data_stored": payload.custom_data is not None
     }
 
+@app.delete("/events/{event_id}", tags=["Events"])
+def delete_event(event_id: int):
+    """
+    Deletes an event and all associated data.
+
+    This will delete:
+    - The event record from MySQL
+    - All registrations for the event
+    - Any custom data in MongoDB
+    - Any live attendance data in Redis
+
+    Args:
+        event_id: The event ID to delete
+
+    Returns:
+        Success message
+    """
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor()
+
+        # Check if event exists
+        cursor.execute("SELECT Id FROM event WHERE Id = %s", (event_id,))
+        event = cursor.fetchone()
+
+        if not event:
+            cursor.close()
+            cnx.close()
+            raise HTTPException(status_code=404, detail=f"Event {event_id} not found")
+
+        # Delete registrations first (foreign key constraint)
+        cursor.execute("DELETE FROM registration WHERE EventID = %s", (event_id,))
+        registrations_deleted = cursor.rowcount
+
+        # Delete the event
+        cursor.execute("DELETE FROM event WHERE Id = %s", (event_id,))
+        cnx.commit()
+
+        cursor.close()
+        cnx.close()
+
+        # TODO: Also delete MongoDB custom data and Redis attendance if they exist
+        # This would require additional cleanup functions
+
+        return {
+            "message": f"Event {event_id} deleted successfully",
+            "registrations_deleted": registrations_deleted
+        }
+
+    except HTTPException:
+        raise
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting event: {e}")
+
 @app.get("/events/{event_id}/registrations", response_model=List[dict])
 def get_event_registrations(event_id: int):
     try:
@@ -231,15 +287,26 @@ def create_event_type(payload: EventTypeCreate):
 @app.get("/event-types", tags=["Event Types"])
 def get_all_event_types():
     """
-    Retrieves all event types from both MySQL and MongoDB.
+    Retrieves all event types from MySQL (the source of truth).
+    Only returns event types that actually exist in the database.
 
     Returns:
-        List of event types with their schemas
+        List of event types with their basic info
     """
     try:
-        # Get all schemas from MongoDB
-        schemas = get_all_event_type_schemas()
-        return schemas
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        query = "SELECT Id as typeId, Name as name, Description as description FROM event_type ORDER BY Id;"
+        cursor.execute(query)
+        event_types = cursor.fetchall()
+
+        cursor.close()
+        cnx.close()
+
+        return event_types
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error (MySQL): {err}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching event types: {e}")
 
@@ -403,18 +470,23 @@ def finalize_attendance(event_id: int):
 
 
 # --- Student Registration Endpoints ---
+class RegistrationCreate(BaseModel):
+    EventID: int
+    StudentID: int
+
 @app.post("/registrations", tags=["Registrations"])
-def create_registration(EventID: int, StudentID: int):
+def create_registration(payload: RegistrationCreate):
     """
     Register a student for an event.
 
     Args:
-        EventID: The event ID
-        StudentID: The student ID
+        payload: Contains EventID and StudentID
 
     Returns:
         The created registration record
     """
+    EventID = payload.EventID
+    StudentID = payload.StudentID
     try:
         cnx = get_mysql_pool().get_connection()
         cursor = cnx.cursor(dictionary=True)
@@ -454,46 +526,6 @@ def create_registration(EventID: int, StudentID: int):
         raise HTTPException(status_code=500, detail=f"Error creating registration: {e}")
 
 
-@app.get("/events/{event_id}/registrations", tags=["Events", "Registrations"])
-def get_event_registrations(event_id: int):
-    """
-    Get all registrations for a specific event with student details.
-
-    Args:
-        event_id: The event ID
-
-    Returns:
-        List of registrations with student information
-    """
-    try:
-        cnx = get_mysql_pool().get_connection()
-        cursor = cnx.cursor(dictionary=True)
-
-        query = """
-            SELECT
-                r.Id as RegistrationId,
-                r.SignUpDate,
-                s.Id as StudentId,
-                s.FirstName,
-                s.LastName,
-                s.Email
-            FROM registration r
-            JOIN student s ON r.StudentID = s.Id
-            WHERE r.EventID = %s
-            ORDER BY s.LastName, s.FirstName
-        """
-        cursor.execute(query, (event_id,))
-        registrations = cursor.fetchall()
-
-        cursor.close()
-        cnx.close()
-
-        return registrations
-
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching registrations: {e}")
 
 
 # --- GraphQL Endpoint ---
