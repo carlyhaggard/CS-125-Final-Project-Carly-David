@@ -402,6 +402,100 @@ def finalize_attendance(event_id: int):
         raise HTTPException(status_code=500, detail=f"Error finalizing attendance: {e}")
 
 
+# --- Student Registration Endpoints ---
+@app.post("/registrations", tags=["Registrations"])
+def create_registration(EventID: int, StudentID: int):
+    """
+    Register a student for an event.
+
+    Args:
+        EventID: The event ID
+        StudentID: The student ID
+
+    Returns:
+        The created registration record
+    """
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if student is already registered
+        check_query = "SELECT * FROM registration WHERE StudentID = %s AND EventID = %s"
+        cursor.execute(check_query, (StudentID, EventID))
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.close()
+            cnx.close()
+            return {"message": "Student already registered", "registration": existing}
+
+        # Create registration
+        insert_query = """
+            INSERT INTO registration (StudentID, EventID, SignUpDate)
+            VALUES (%s, %s, CURDATE())
+        """
+        cursor.execute(insert_query, (StudentID, EventID))
+        cnx.commit()
+
+        registration_id = cursor.lastrowid
+
+        # Fetch the created registration
+        cursor.execute("SELECT * FROM registration WHERE Id = %s", (registration_id,))
+        new_registration = cursor.fetchone()
+
+        cursor.close()
+        cnx.close()
+
+        return new_registration
+
+    except mysql.connector.Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating registration: {e}")
+
+
+@app.get("/events/{event_id}/registrations", tags=["Events", "Registrations"])
+def get_event_registrations(event_id: int):
+    """
+    Get all registrations for a specific event with student details.
+
+    Args:
+        event_id: The event ID
+
+    Returns:
+        List of registrations with student information
+    """
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        query = """
+            SELECT
+                r.Id as RegistrationId,
+                r.SignUpDate,
+                s.Id as StudentId,
+                s.FirstName,
+                s.LastName,
+                s.Email
+            FROM registration r
+            JOIN student s ON r.StudentID = s.Id
+            WHERE r.EventID = %s
+            ORDER BY s.LastName, s.FirstName
+        """
+        cursor.execute(query, (event_id,))
+        registrations = cursor.fetchall()
+
+        cursor.close()
+        cnx.close()
+
+        return registrations
+
+    except mysql.connector.Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching registrations: {e}")
+
+
 # --- GraphQL Endpoint ---
 # This section integrates GraphQL with FastAPI.
 # GraphQL will run ALONGSIDE your existing REST API.
