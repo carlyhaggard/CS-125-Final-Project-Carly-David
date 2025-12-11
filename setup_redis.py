@@ -157,6 +157,16 @@ def finalize_event_attendance(event_id: int) -> dict:
             cursor.close()
             cnx.close()
 
+def get_random_winner(event_id: int):
+    r = get_redis_conn()
+    key = f"event:{event_id}:checkedIn"
+    try:
+        result = r.srandmember(key)
+        if result is None:
+            return None
+        return int(result)
+    except Exception as e:
+        raise ConnectionError(e)
 
 def setup_redis_data():
     """Connects to Redis and sets up sample data."""
