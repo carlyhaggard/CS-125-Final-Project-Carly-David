@@ -1,5 +1,182 @@
 import React, { useState } from 'react';
 
+// Helper to render a single value (primitive or nested object)
+function ValueCell({ value }) {
+  if (value === null || value === undefined) {
+    return <span className="cell-null">—</span>;
+  }
+
+  if (typeof value === 'boolean') {
+    return <span className="cell-boolean">{value ? '✓' : '✗'}</span>;
+  }
+
+  if (typeof value === 'number') {
+    return <span className="cell-number">{value}</span>;
+  }
+
+  if (typeof value === 'string') {
+    return <span className="cell-string">{value}</span>;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <span className="cell-empty">—</span>;
+    }
+    // If array of primitives, show as comma-separated
+    if (typeof value[0] !== 'object') {
+      return <span className="cell-array">{value.join(', ')}</span>;
+    }
+    // If array of objects, show count
+    return <span className="cell-array">{value.length} items</span>;
+  }
+
+  if (typeof value === 'object') {
+    // For nested objects, show a summary
+    const keys = Object.keys(value);
+    if (keys.length === 0) {
+      return <span className="cell-empty">—</span>;
+    }
+    // Show the object's values inline
+    return (
+      <div className="nested-object">
+        {keys.map(key => (
+          <div key={key} className="nested-row">
+            <strong>{key}:</strong> <ValueCell value={value[key]} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return <span>{String(value)}</span>;
+}
+
+// Component to render an array as a table
+function TableRenderer({ data, title }) {
+  if (!Array.isArray(data) || data.length === 0) {
+    return <p className="no-data">No data to display</p>;
+  }
+
+  // Get all unique keys from all objects in the array
+  const allKeys = new Set();
+  data.forEach(item => {
+    if (typeof item === 'object' && item !== null) {
+      Object.keys(item).forEach(key => allKeys.add(key));
+    }
+  });
+
+  const columns = Array.from(allKeys);
+
+  // If items aren't objects, just show them in a single column
+  if (columns.length === 0) {
+    return (
+      <div className="table-container">
+        {title && <h4 className="table-title">{title}</h4>}
+        <table className="result-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((item, index) => (
+              <tr key={index}>
+                <td className="row-number">{index + 1}</td>
+                <td><ValueCell value={item} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div className="table-container">
+      {title && <h4 className="table-title">{title}</h4>}
+      <table className="result-table">
+        <thead>
+          <tr>
+            <th className="row-number-header">#</th>
+            {columns.map(col => (
+              <th key={col}>{col}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((item, index) => (
+            <tr key={index}>
+              <td className="row-number">{index + 1}</td>
+              {columns.map(col => (
+                <td key={col}>
+                  <ValueCell value={item[col]} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Main renderer that decides how to display the data
+function ResultRenderer({ data }) {
+  if (!data) {
+    return <p className="no-data">No results</p>;
+  }
+
+  // Get the root keys
+  const rootKeys = Object.keys(data);
+
+  return (
+    <div className="results-container">
+      {rootKeys.map(key => {
+        const value = data[key];
+
+        // If it's an array, render as table
+        if (Array.isArray(value)) {
+          return <TableRenderer key={key} data={value} title={key} />;
+        }
+
+        // If it's a single object, show it as a card
+        if (typeof value === 'object' && value !== null) {
+          return (
+            <div key={key} className="result-card">
+              <h4 className="card-title">{key}</h4>
+              <div className="card-content">
+                {Object.keys(value).map(subKey => {
+                  const subValue = value[subKey];
+
+                  // If nested value is an array, show as table
+                  if (Array.isArray(subValue)) {
+                    return <TableRenderer key={subKey} data={subValue} title={subKey} />;
+                  }
+
+                  // Otherwise show as key-value pair
+                  return (
+                    <div key={subKey} className="card-row">
+                      <strong>{subKey}:</strong> <ValueCell value={subValue} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        // For primitives, show as simple key-value
+        return (
+          <div key={key} className="result-card">
+            <strong>{key}:</strong> <ValueCell value={value} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const EXAMPLE_QUERIES = {
   students: `query GetAllStudents {
   students {
@@ -213,7 +390,9 @@ function GraphQLDemo() {
       {result && (
         <div className="graphql-result">
           <h3>✅ Result:</h3>
-          <pre>{JSON.stringify(result, null, 2)}</pre>
+          <div className="result-formatted">
+            <ResultRenderer data={result} />
+          </div>
         </div>
       )}
 
