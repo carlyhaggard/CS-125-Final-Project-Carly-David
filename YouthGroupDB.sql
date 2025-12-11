@@ -54,10 +54,17 @@ CREATE TABLE weekly_attendance(
                                   FOREIGN KEY (StudentID) REFERENCES student(Id),
                                   FOREIGN KEY (WeeklyGatheringID) REFERENCES weekly_gathering(Id));
 
+CREATE TABLE event_type (
+                            Id INT AUTO_INCREMENT PRIMARY KEY,
+                            Name VARCHAR(255) NOT NULL,
+                            Description TEXT NULL);
+
 CREATE TABLE event(
                       Id INT PRIMARY KEY AUTO_INCREMENT,
                       Description VARCHAR(255),
-                      Address VARCHAR(255) NOT NULL);
+                      Address VARCHAR(255) NOT NULL,
+                      TypeID INT,
+                      FOREIGN KEY (TypeID) REFERENCES event_type(Id));
 
 CREATE TABLE registration(
                              Id INT PRIMARY KEY AUTO_INCREMENT,
@@ -81,11 +88,6 @@ CREATE TABLE volunteer(
                           Email VARCHAR(50),
                           Phone CHAR(10) NOT NULL);
 
-CREATE TABLE event_type (
-                            Id INT AUTO_INCREMENT PRIMARY KEY,
-                            Name VARCHAR(255) NOT NULL,
-                            Description TEXT NULL);
-
 CREATE TABLE volunteer_log(
                               VolunteerID INT,
                               EventID INT,
@@ -93,6 +95,15 @@ CREATE TABLE volunteer_log(
                               FOREIGN KEY (StudentID) REFERENCES student(Id),
                               FOREIGN KEY (VolunteerID) REFERENCES volunteer(Id),
                               FOREIGN KEY (EventID) REFERENCES event(Id));
+
+CREATE TABLE event_attendance(
+                                  Id INT PRIMARY KEY AUTO_INCREMENT,
+                                  EventID INT NOT NULL,
+                                  StudentID INT NOT NULL,
+                                  CheckInTime DATETIME,
+                                  CheckOutTime DATETIME,
+                                  FOREIGN KEY (EventID) REFERENCES event(Id),
+                                  FOREIGN KEY (StudentID) REFERENCES student(Id));
 
 
 

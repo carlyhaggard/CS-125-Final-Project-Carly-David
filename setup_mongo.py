@@ -1,10 +1,217 @@
 from database import get_mongo_db, close_connections
+from datetime import datetime
+from typing import Optional, List, Dict
+
+# --- Event Type Operations ---
+
+def create_event_type_schema(type_id: int, name: str, description: Optional[str], fields: List[Dict]) -> dict:
+    """
+    Creates an event type schema document in MongoDB.
+
+    Args:
+        type_id: The ID from MySQL event_type table
+        name: Name of the event type
+        description: Optional description
+        fields: List of custom field definitions, e.g., [{"name": "age", "type": "number", "required": True}]
+
+    Returns:
+        The inserted document
+    """
+    db = get_mongo_db()
+    schema_doc = {
+        "typeId": type_id,
+        "name": name,
+        "description": description,
+        "fields": fields,
+        "createdAt": datetime.utcnow().isoformat(),
+        "updatedAt": datetime.utcnow().isoformat()
+    }
+    result = db.eventTypes.insert_one(schema_doc)
+    schema_doc["_id"] = str(result.inserted_id)
+    return schema_doc
+
+def get_event_type_schema(type_id: int) -> Optional[dict]:
+    """
+    Retrieves an event type schema by its MySQL type ID.
+
+    Args:
+        type_id: The ID from MySQL event_type table
+
+    Returns:
+        The schema document or None if not found
+    """
+    db = get_mongo_db()
+    schema = db.eventTypes.find_one({"typeId": type_id})
+    if schema and "_id" in schema:
+        schema["_id"] = str(schema["_id"])
+    return schema
+
+def get_all_event_type_schemas() -> List[dict]:
+    """
+    Retrieves all event type schemas.
+
+    Returns:
+        List of schema documents
+    """
+    db = get_mongo_db()
+    schemas = list(db.eventTypes.find())
+    for schema in schemas:
+        if "_id" in schema:
+            schema["_id"] = str(schema["_id"])
+    return schemas
+
+def update_event_type_schema(type_id: int, name: Optional[str] = None,
+                             description: Optional[str] = None,
+                             fields: Optional[List[Dict]] = None) -> bool:
+    """
+    Updates an event type schema.
+
+    Args:
+        type_id: The ID from MySQL event_type table
+        name: Optional new name
+        description: Optional new description
+        fields: Optional new field definitions
+
+    Returns:
+        True if update was successful, False otherwise
+    """
+    db = get_mongo_db()
+    update_doc = {"updatedAt": datetime.utcnow().isoformat()}
+
+    if name is not None:
+        update_doc["name"] = name
+    if description is not None:
+        update_doc["description"] = description
+    if fields is not None:
+        update_doc["fields"] = fields
+
+    result = db.eventTypes.update_one(
+        {"typeId": type_id},
+        {"$set": update_doc}
+    )
+    return result.modified_count > 0
+
+def delete_event_type_schema(type_id: int) -> bool:
+    """
+    Deletes an event type schema.
+
+    Args:
+        type_id: The ID from MySQL event_type table
+
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    db = get_mongo_db()
+    result = db.eventTypes.delete_one({"typeId": type_id})
+    return result.deleted_count > 0
+
+# --- Per-Event Custom Field Operations ---
+
+def store_event_custom_data(event_id: int, custom_data: Dict) -> dict:
+    """
+    Stores custom field values for a specific event.
+
+    Args:
+        event_id: The ID from MySQL event table
+        custom_data: Dictionary of custom field values
+
+    Returns:
+        The inserted document
+    """
+    db = get_mongo_db()
+    event_doc = {
+        "eventId": event_id,
+        "customData": custom_data,
+        "createdAt": datetime.utcnow().isoformat(),
+        "updatedAt": datetime.utcnow().isoformat()
+    }
+    result = db.eventCustomData.insert_one(event_doc)
+    event_doc["_id"] = str(result.inserted_id)
+    return event_doc
+
+def get_event_custom_data(event_id: int) -> Optional[dict]:
+    """
+    Retrieves custom field values for a specific event.
+
+    Args:
+        event_id: The ID from MySQL event table
+
+    Returns:
+        The custom data document or None if not found
+    """
+    db = get_mongo_db()
+    event_doc = db.eventCustomData.find_one({"eventId": event_id})
+    if event_doc and "_id" in event_doc:
+        event_doc["_id"] = str(event_doc["_id"])
+    return event_doc
+
+def update_event_custom_data(event_id: int, custom_data: Dict) -> bool:
+    """
+    Updates custom field values for a specific event.
+
+    Args:
+        event_id: The ID from MySQL event table
+        custom_data: New dictionary of custom field values
+
+    Returns:
+        True if update was successful, False otherwise
+    """
+    db = get_mongo_db()
+    result = db.eventCustomData.update_one(
+        {"eventId": event_id},
+        {
+            "$set": {
+                "customData": custom_data,
+                "updatedAt": datetime.utcnow().isoformat()
+            }
+        }
+    )
+    return result.modified_count > 0
+
+def delete_event_custom_data(event_id: int) -> bool:
+    """
+    Deletes custom field values for a specific event.
+
+    Args:
+        event_id: The ID from MySQL event table
+
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    db = get_mongo_db()
+    result = db.eventCustomData.delete_one({"eventId": event_id})
+    return result.deleted_count > 0
+
+# --- Setup and Initialization ---
+
+def setup_mongo_indexes():
+    """
+    Creates indexes on MongoDB collections for better query performance.
+    """
+    db = get_mongo_db()
+
+    # Index on eventTypes collection
+    db.eventTypes.create_index("typeId", unique=True)
+    print("Created unique index on eventTypes.typeId")
+
+    # Index on eventCustomData collection
+    db.eventCustomData.create_index("eventId", unique=True)
+    print("Created unique index on eventCustomData.eventId")
 
 def setup_mongo_data():
+    """
+    Initializes MongoDB with indexes and optional sample data.
+    """
     try:
         db = get_mongo_db()
+        print("Successfully connected to MongoDB")
+
+        # Create indexes
+        setup_mongo_indexes()
+
+        print("MongoDB setup completed successfully")
     except Exception as e:
-        print(e)
+        print(f"Error during MongoDB setup: {e}")
     finally:
         close_connections()
 

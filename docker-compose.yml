@@ -15,7 +15,7 @@ services:
       MYSQL_DATABASE: youth_group_program
     ports:
       # Makes the database accessible from your local machine on the standard port.
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       # This persists your database data even if the container is removed.
       - db_data:/var/lib/mysql
@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
     ports:
       # Makes Redis accessible from your local machine.
-      - "6379:6379"
+      - "6380:6379"
 
 volumes:
   # Defines the named volume for persisting MySQL data.
