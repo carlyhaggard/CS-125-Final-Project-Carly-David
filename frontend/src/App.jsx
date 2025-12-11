@@ -5,6 +5,11 @@ import CreateEventTypeForm from './components/CreateEventTypeForm';
 import CreateEventForm from './components/CreateEventForm';
 import GraphQLDemo from './components/GraphQLDemo';
 import StudentList from './components/StudentList';
+import StudentManagement from './components/StudentManagement';
+import ParentManagement from './components/ParentManagement';
+import SmallGroupManagement from './components/SmallGroupManagement';
+import LeaderManagement from './components/LeaderManagement';
+import VolunteerManagement from './components/VolunteerManagement';
 import './App.css';
 
 const API_URL = 'http://localhost:8000';
@@ -129,7 +134,31 @@ function App() {
           className={`tab ${activeTab === 'students' ? 'active' : ''}`}
           onClick={() => setActiveTab('students')}
         >
-          👥 Students
+          👨‍🎓 Student Management
+        </button>
+        <button
+          className={`tab ${activeTab === 'parents' ? 'active' : ''}`}
+          onClick={() => setActiveTab('parents')}
+        >
+          👨‍👩‍👧 Parent Management
+        </button>
+        <button
+          className={`tab ${activeTab === 'groups' ? 'active' : ''}`}
+          onClick={() => setActiveTab('groups')}
+        >
+          👥 Small Groups
+        </button>
+        <button
+          className={`tab ${activeTab === 'leaders' ? 'active' : ''}`}
+          onClick={() => setActiveTab('leaders')}
+        >
+          🎓 Leaders
+        </button>
+        <button
+          className={`tab ${activeTab === 'volunteers' ? 'active' : ''}`}
+          onClick={() => setActiveTab('volunteers')}
+        >
+          🤝 Volunteers
         </button>
         <button
           className={`tab ${activeTab === 'graphql' ? 'active' : ''}`}
@@ -171,7 +200,31 @@ function App() {
 
         {activeTab === 'students' && (
           <div className="column-full">
-            <StudentList />
+            <StudentManagement />
+          </div>
+        )}
+
+        {activeTab === 'parents' && (
+          <div className="column-full">
+            <ParentManagement />
+          </div>
+        )}
+
+        {activeTab === 'groups' && (
+          <div className="column-full">
+            <SmallGroupManagement />
+          </div>
+        )}
+
+        {activeTab === 'leaders' && (
+          <div className="column-full">
+            <LeaderManagement />
+          </div>
+        )}
+
+        {activeTab === 'volunteers' && (
+          <div className="column-full">
+            <VolunteerManagement />
           </div>
         )}
 

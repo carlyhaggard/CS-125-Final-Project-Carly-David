@@ -193,7 +193,7 @@ const EXAMPLE_QUERIES = {
     address
   }
 }`,
-  completeEvent: `query GetCompleteEvent($eventId: Int!) {
+  eventDetails: `query GetEventDetails($eventId: Int!) {
   event(id: $eventId) {
     description
     address
@@ -242,7 +242,7 @@ const EXAMPLE_QUERIES = {
 };
 
 const EXAMPLE_VARIABLES = {
-  completeEvent: '{\n  "eventId": 1\n}',
+  eventDetails: '{\n  "eventId": 1\n}',
   studentProfile: '{\n  "studentId": 1\n}'
 };
 
@@ -329,10 +329,10 @@ function GraphQLDemo() {
             All Events
           </button>
           <button
-            className={selectedQuery === 'completeEvent' ? 'active' : ''}
-            onClick={() => handleQuerySelect('completeEvent')}
+            className={selectedQuery === 'eventDetails' ? 'active' : ''}
+            onClick={() => handleQuerySelect('eventDetails')}
           >
-            Complete Event 🔥
+            Event Details 🔥
           </button>
           <button
             className={selectedQuery === 'studentProfile' ? 'active' : ''}
@@ -356,7 +356,7 @@ function GraphQLDemo() {
       </div>
 
       {/* Variables Editor */}
-      {(selectedQuery === 'completeEvent' || selectedQuery === 'studentProfile') && (
+      {(selectedQuery === 'eventDetails' || selectedQuery === 'studentProfile') && (
         <div className="form-group">
           <label htmlFor="graphql-variables">Variables (JSON):</label>
           <textarea
@@ -398,7 +398,7 @@ function GraphQLDemo() {
 
       {/* Info Box */}
       <div className="graphql-info">
-        <strong>💡 Tip:</strong> The "Complete Event" query fetches data from all three databases:
+        <strong>💡 Tip:</strong> The "Event Details" query fetches data from all three databases:
         <ul>
           <li><strong>MySQL:</strong> Event details, registrations</li>
           <li><strong>MongoDB:</strong> Event type schema, custom fields</li>

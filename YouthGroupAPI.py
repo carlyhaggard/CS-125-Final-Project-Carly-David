@@ -107,11 +107,999 @@ class EventTypeUpdate(BaseModel):
 class CheckInAction(BaseModel):
     student_id: int
 
+class StudentCreate(BaseModel):
+    FirstName: str
+    LastName: Optional[str] = None
+    Grade: str
+
+class StudentUpdate(BaseModel):
+    FirstName: Optional[str] = None
+    LastName: Optional[str] = None
+    Grade: Optional[str] = None
+
+class ParentCreate(BaseModel):
+    FirstName: str
+    LastName: Optional[str] = None
+    Relationship: str
+    Email: Optional[str] = None
+    Phone: str
+
+class ParentUpdate(BaseModel):
+    FirstName: Optional[str] = None
+    LastName: Optional[str] = None
+    Relationship: Optional[str] = None
+    Email: Optional[str] = None
+    Phone: Optional[str] = None
+
+class FamilyLink(BaseModel):
+    StudentID: int
+    ParentID: int
+
 # --- API Endpoints ---
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Youth Group Program API!"}
+
+# --- Student CRUD Endpoints ---
+
+@app.get("/students", tags=["Students"])
+def get_all_students():
+    """Get all students from the database."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute("SELECT Id, FirstName, LastName, Grade FROM student ORDER BY LastName, FirstName;")
+        students = cursor.fetchall()
+        return students
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.get("/students/{student_id}", tags=["Students"])
+def get_student(student_id: int):
+    """Get a single student by ID."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute("SELECT Id, FirstName, LastName, Grade FROM student WHERE Id = %s;", (student_id,))
+        student = cursor.fetchone()
+
+        if not student:
+            raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
+
+        return student
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.post("/students", tags=["Students"])
+def create_student(payload: StudentCreate):
+    """Create a new student."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        insert_sql = "INSERT INTO student (FirstName, LastName, Grade) VALUES (%s, %s, %s);"
+        cursor.execute(insert_sql, (payload.FirstName, payload.LastName, payload.Grade))
+        cnx.commit()
+
+        student_id = cursor.lastrowid
+
+        # Fetch the created student
+        cursor.execute("SELECT Id, FirstName, LastName, Grade FROM student WHERE Id = %s;", (student_id,))
+        new_student = cursor.fetchone()
+
+        return new_student
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.put("/students/{student_id}", tags=["Students"])
+def update_student(student_id: int, payload: StudentUpdate):
+    """Update a student's information."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if student exists
+        cursor.execute("SELECT Id FROM student WHERE Id = %s;", (student_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
+
+        # Build update query dynamically based on provided fields
+        update_parts = []
+        update_values = []
+
+        if payload.FirstName is not None:
+            update_parts.append("FirstName = %s")
+            update_values.append(payload.FirstName)
+        if payload.LastName is not None:
+            update_parts.append("LastName = %s")
+            update_values.append(payload.LastName)
+        if payload.Grade is not None:
+            update_parts.append("Grade = %s")
+            update_values.append(payload.Grade)
+
+        if not update_parts:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        update_sql = f"UPDATE student SET {', '.join(update_parts)} WHERE Id = %s;"
+        update_values.append(student_id)
+        cursor.execute(update_sql, tuple(update_values))
+        cnx.commit()
+
+        # Fetch updated student
+        cursor.execute("SELECT Id, FirstName, LastName, Grade FROM student WHERE Id = %s;", (student_id,))
+        updated_student = cursor.fetchone()
+
+        return updated_student
+    except HTTPException:
+        raise
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/students/{student_id}", tags=["Students"])
+def delete_student(student_id: int):
+    """Delete a student and all associated data."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor()
+
+        # Check if student exists
+        cursor.execute("SELECT Id FROM student WHERE Id = %s;", (student_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
+
+        # Delete associated records first (foreign key constraints)
+        cursor.execute("DELETE FROM registration WHERE StudentID = %s;", (student_id,))
+        registrations_deleted = cursor.rowcount
+
+        cursor.execute("DELETE FROM sign_up WHERE StudentID = %s;", (student_id,))
+        signups_deleted = cursor.rowcount
+
+        cursor.execute("DELETE FROM weekly_attendance WHERE StudentID = %s;", (student_id,))
+        attendance_deleted = cursor.rowcount
+
+        cursor.execute("DELETE FROM family WHERE StudentID = %s;", (student_id,))
+        family_deleted = cursor.rowcount
+
+        # Delete the student
+        cursor.execute("DELETE FROM student WHERE Id = %s;", (student_id,))
+        cnx.commit()
+
+        return {
+            "message": f"Student {student_id} deleted successfully",
+            "registrations_deleted": registrations_deleted,
+            "signups_deleted": signups_deleted,
+            "attendance_deleted": attendance_deleted,
+            "family_links_deleted": family_deleted
+        }
+    except HTTPException:
+        raise
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+# --- Parent/Guardian CRUD Endpoints ---
+
+@app.get("/parents", tags=["Parents"])
+def get_all_parents():
+    """Get all parents/guardians from the database."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute("SELECT Id, FirstName, LastName, Relationship, Email, Phone FROM parent_guardian ORDER BY LastName, FirstName;")
+        parents = cursor.fetchall()
+        return parents
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.get("/parents/{parent_id}", tags=["Parents"])
+def get_parent(parent_id: int):
+    """Get a single parent by ID with their linked students."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Get parent info
+        cursor.execute("SELECT Id, FirstName, LastName, Relationship, Email, Phone FROM parent_guardian WHERE Id = %s;", (parent_id,))
+        parent = cursor.fetchone()
+
+        if not parent:
+            raise HTTPException(status_code=404, detail=f"Parent {parent_id} not found")
+
+        # Get linked students
+        cursor.execute("""
+            SELECT s.Id, s.FirstName, s.LastName, s.Grade
+            FROM student s
+            JOIN family f ON s.Id = f.StudentID
+            WHERE f.ParentID = %s;
+        """, (parent_id,))
+        parent['students'] = cursor.fetchall()
+
+        return parent
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.post("/parents", tags=["Parents"])
+def create_parent(payload: ParentCreate):
+    """Create a new parent/guardian."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        insert_sql = "INSERT INTO parent_guardian (FirstName, LastName, Relationship, Email, Phone) VALUES (%s, %s, %s, %s, %s);"
+        cursor.execute(insert_sql, (payload.FirstName, payload.LastName, payload.Relationship, payload.Email, payload.Phone))
+        cnx.commit()
+
+        parent_id = cursor.lastrowid
+
+        # Fetch the created parent
+        cursor.execute("SELECT Id, FirstName, LastName, Relationship, Email, Phone FROM parent_guardian WHERE Id = %s;", (parent_id,))
+        new_parent = cursor.fetchone()
+
+        return new_parent
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.put("/parents/{parent_id}", tags=["Parents"])
+def update_parent(parent_id: int, payload: ParentUpdate):
+    """Update a parent's information."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if parent exists
+        cursor.execute("SELECT Id FROM parent_guardian WHERE Id = %s;", (parent_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Parent {parent_id} not found")
+
+        # Build update query dynamically
+        update_parts = []
+        update_values = []
+
+        if payload.FirstName is not None:
+            update_parts.append("FirstName = %s")
+            update_values.append(payload.FirstName)
+        if payload.LastName is not None:
+            update_parts.append("LastName = %s")
+            update_values.append(payload.LastName)
+        if payload.Relationship is not None:
+            update_parts.append("Relationship = %s")
+            update_values.append(payload.Relationship)
+        if payload.Email is not None:
+            update_parts.append("Email = %s")
+            update_values.append(payload.Email)
+        if payload.Phone is not None:
+            update_parts.append("Phone = %s")
+            update_values.append(payload.Phone)
+
+        if not update_parts:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        update_sql = f"UPDATE parent_guardian SET {', '.join(update_parts)} WHERE Id = %s;"
+        update_values.append(parent_id)
+        cursor.execute(update_sql, tuple(update_values))
+        cnx.commit()
+
+        # Fetch updated parent
+        cursor.execute("SELECT Id, FirstName, LastName, Relationship, Email, Phone FROM parent_guardian WHERE Id = %s;", (parent_id,))
+        updated_parent = cursor.fetchone()
+
+        return updated_parent
+    except HTTPException:
+        raise
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/parents/{parent_id}", tags=["Parents"])
+def delete_parent(parent_id: int):
+    """Delete a parent and their family links."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor()
+
+        # Check if parent exists
+        cursor.execute("SELECT Id FROM parent_guardian WHERE Id = %s;", (parent_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Parent {parent_id} not found")
+
+        # Delete family links first
+        cursor.execute("DELETE FROM family WHERE ParentID = %s;", (parent_id,))
+        links_deleted = cursor.rowcount
+
+        # Delete the parent
+        cursor.execute("DELETE FROM parent_guardian WHERE Id = %s;", (parent_id,))
+        cnx.commit()
+
+        return {
+            "message": f"Parent {parent_id} deleted successfully",
+            "family_links_deleted": links_deleted
+        }
+    except HTTPException:
+        raise
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+# --- Family Link Endpoints ---
+
+@app.post("/family", tags=["Family"])
+def link_parent_to_student(payload: FamilyLink):
+    """Link a parent to a student."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if student exists
+        cursor.execute("SELECT Id FROM student WHERE Id = %s;", (payload.StudentID,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Student {payload.StudentID} not found")
+
+        # Check if parent exists
+        cursor.execute("SELECT Id FROM parent_guardian WHERE Id = %s;", (payload.ParentID,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Parent {payload.ParentID} not found")
+
+        # Check if link already exists
+        cursor.execute("SELECT * FROM family WHERE StudentID = %s AND ParentID = %s;", (payload.StudentID, payload.ParentID))
+        if cursor.fetchone():
+            return {"message": "Link already exists", "StudentID": payload.StudentID, "ParentID": payload.ParentID}
+
+        # Create the link
+        cursor.execute("INSERT INTO family (StudentID, ParentID) VALUES (%s, %s);", (payload.StudentID, payload.ParentID))
+        cnx.commit()
+
+        return {"message": "Parent linked to student successfully", "StudentID": payload.StudentID, "ParentID": payload.ParentID}
+    except HTTPException:
+        raise
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/family/{student_id}/{parent_id}", tags=["Family"])
+def unlink_parent_from_student(student_id: int, parent_id: int):
+    """Unlink a parent from a student."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor()
+
+        # Check if link exists
+        cursor.execute("SELECT * FROM family WHERE StudentID = %s AND ParentID = %s;", (student_id, parent_id))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Family link not found")
+
+        # Delete the link
+        cursor.execute("DELETE FROM family WHERE StudentID = %s AND ParentID = %s;", (student_id, parent_id))
+        cnx.commit()
+
+        return {"message": "Parent unlinked from student successfully"}
+    except HTTPException:
+        raise
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.get("/students/{student_id}/parents", tags=["Students", "Family"])
+def get_student_parents(student_id: int):
+    """Get all parents/guardians for a student."""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        query = """
+            SELECT pg.Id, pg.FirstName, pg.LastName, pg.Relationship, pg.Email, pg.Phone
+            FROM parent_guardian pg
+            JOIN family f ON pg.Id = f.ParentID
+            WHERE f.StudentID = %s;
+        """
+        cursor.execute(query, (student_id,))
+        parents = cursor.fetchall()
+
+        return parents
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+# ==================== SMALL GROUP MANAGEMENT ====================
+class SmallGroupCreate(BaseModel):
+    Grade: str
+
+@app.get("/small-groups")
+def get_all_small_groups():
+    """Fetch all small groups"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute("SELECT Id, Grade FROM small_group ORDER BY Grade;")
+        groups = cursor.fetchall()
+        return groups
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.get("/small-groups/{group_id}")
+def get_small_group(group_id: int):
+    """Fetch a single small group with its students"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Get group details
+        cursor.execute("SELECT Id, Grade FROM small_group WHERE Id = %s;", (group_id,))
+        group = cursor.fetchone()
+
+        if not group:
+            raise HTTPException(status_code=404, detail="Small group not found")
+
+        # Get students in this group
+        cursor.execute("""
+            SELECT s.Id, s.FirstName, s.LastName, s.Grade, su.SignUpDate
+            FROM student s
+            JOIN sign_up su ON s.Id = su.StudentID
+            WHERE su.SmallGroupID = %s
+            ORDER BY s.FirstName, s.LastName;
+        """, (group_id,))
+        students = cursor.fetchall()
+
+        group['students'] = students
+        return group
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.post("/small-groups")
+def create_small_group(group: SmallGroupCreate):
+    """Create a new small group"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        cursor.execute("INSERT INTO small_group (Grade) VALUES (%s);", (group.Grade,))
+        cnx.commit()
+
+        group_id = cursor.lastrowid
+        cursor.execute("SELECT Id, Grade FROM small_group WHERE Id = %s;", (group_id,))
+        new_group = cursor.fetchone()
+
+        return new_group
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.put("/small-groups/{group_id}")
+def update_small_group(group_id: int, group: SmallGroupCreate):
+    """Update an existing small group"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if group exists
+        cursor.execute("SELECT Id FROM small_group WHERE Id = %s;", (group_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Small group not found")
+
+        cursor.execute("UPDATE small_group SET Grade = %s WHERE Id = %s;", (group.Grade, group_id))
+        cnx.commit()
+
+        cursor.execute("SELECT Id, Grade FROM small_group WHERE Id = %s;", (group_id,))
+        updated_group = cursor.fetchone()
+
+        return updated_group
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/small-groups/{group_id}")
+def delete_small_group(group_id: int):
+    """Delete a small group and all student assignments"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if group exists
+        cursor.execute("SELECT Id FROM small_group WHERE Id = %s;", (group_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Small group not found")
+
+        # Delete student assignments first
+        cursor.execute("DELETE FROM sign_up WHERE SmallGroupID = %s;", (group_id,))
+
+        # Delete the group
+        cursor.execute("DELETE FROM small_group WHERE Id = %s;", (group_id,))
+        cnx.commit()
+
+        return {"message": "Small group deleted successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+# Student-to-SmallGroup assignment endpoints
+class StudentGroupAssignment(BaseModel):
+    StudentID: int
+    SmallGroupID: int
+
+@app.post("/small-groups/assign")
+def assign_student_to_group(assignment: StudentGroupAssignment):
+    """Assign a student to a small group"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if already assigned
+        cursor.execute("""
+            SELECT * FROM sign_up
+            WHERE StudentID = %s AND SmallGroupID = %s;
+        """, (assignment.StudentID, assignment.SmallGroupID))
+
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Student already assigned to this group")
+
+        # Insert assignment
+        cursor.execute("""
+            INSERT INTO sign_up (StudentID, SmallGroupID, SignUpDate)
+            VALUES (%s, %s, CURDATE());
+        """, (assignment.StudentID, assignment.SmallGroupID))
+        cnx.commit()
+
+        return {"message": "Student assigned to group successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/small-groups/assign/{student_id}/{group_id}")
+def unassign_student_from_group(student_id: int, group_id: int):
+    """Remove a student from a small group"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        cursor.execute("""
+            DELETE FROM sign_up
+            WHERE StudentID = %s AND SmallGroupID = %s;
+        """, (student_id, group_id))
+        cnx.commit()
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Assignment not found")
+
+        return {"message": "Student unassigned from group successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+# ==================== LEADER MANAGEMENT ====================
+class LeaderCreate(BaseModel):
+    FirstName: str
+    LastName: Optional[str] = None
+    SmallGroupID: Optional[int] = None
+
+@app.get("/leaders")
+def get_all_leaders():
+    """Fetch all leaders with their assigned small groups"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT l.Id, l.FirstName, l.LastName, l.SmallGroupID, sg.Grade
+            FROM leader l
+            LEFT JOIN small_group sg ON l.SmallGroupID = sg.Id
+            ORDER BY l.FirstName, l.LastName;
+        """)
+        leaders = cursor.fetchall()
+        return leaders
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.get("/leaders/{leader_id}")
+def get_leader(leader_id: int):
+    """Fetch a single leader with their assigned small group"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT l.Id, l.FirstName, l.LastName, l.SmallGroupID, sg.Grade
+            FROM leader l
+            LEFT JOIN small_group sg ON l.SmallGroupID = sg.Id
+            WHERE l.Id = %s;
+        """, (leader_id,))
+        leader = cursor.fetchone()
+
+        if not leader:
+            raise HTTPException(status_code=404, detail="Leader not found")
+
+        return leader
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.post("/leaders")
+def create_leader(leader: LeaderCreate):
+    """Create a new leader"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Verify SmallGroupID exists if provided
+        if leader.SmallGroupID:
+            cursor.execute("SELECT Id FROM small_group WHERE Id = %s;", (leader.SmallGroupID,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Small group not found")
+
+        cursor.execute("""
+            INSERT INTO leader (FirstName, LastName, SmallGroupID)
+            VALUES (%s, %s, %s);
+        """, (leader.FirstName, leader.LastName, leader.SmallGroupID))
+        cnx.commit()
+
+        leader_id = cursor.lastrowid
+        cursor.execute("""
+            SELECT l.Id, l.FirstName, l.LastName, l.SmallGroupID, sg.Grade
+            FROM leader l
+            LEFT JOIN small_group sg ON l.SmallGroupID = sg.Id
+            WHERE l.Id = %s;
+        """, (leader_id,))
+        new_leader = cursor.fetchone()
+
+        return new_leader
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.put("/leaders/{leader_id}")
+def update_leader(leader_id: int, leader: LeaderCreate):
+    """Update an existing leader"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if leader exists
+        cursor.execute("SELECT Id FROM leader WHERE Id = %s;", (leader_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Leader not found")
+
+        # Verify SmallGroupID exists if provided
+        if leader.SmallGroupID:
+            cursor.execute("SELECT Id FROM small_group WHERE Id = %s;", (leader.SmallGroupID,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Small group not found")
+
+        cursor.execute("""
+            UPDATE leader
+            SET FirstName = %s, LastName = %s, SmallGroupID = %s
+            WHERE Id = %s;
+        """, (leader.FirstName, leader.LastName, leader.SmallGroupID, leader_id))
+        cnx.commit()
+
+        cursor.execute("""
+            SELECT l.Id, l.FirstName, l.LastName, l.SmallGroupID, sg.Grade
+            FROM leader l
+            LEFT JOIN small_group sg ON l.SmallGroupID = sg.Id
+            WHERE l.Id = %s;
+        """, (leader_id,))
+        updated_leader = cursor.fetchone()
+
+        return updated_leader
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/leaders/{leader_id}")
+def delete_leader(leader_id: int):
+    """Delete a leader"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if leader exists
+        cursor.execute("SELECT Id FROM leader WHERE Id = %s;", (leader_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Leader not found")
+
+        cursor.execute("DELETE FROM leader WHERE Id = %s;", (leader_id,))
+        cnx.commit()
+
+        return {"message": "Leader deleted successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+# ==================== VOLUNTEER MANAGEMENT ====================
+class VolunteerCreate(BaseModel):
+    FirstName: str
+    LastName: Optional[str] = None
+    Email: Optional[str] = None
+    Phone: str
+
+@app.get("/volunteers")
+def get_all_volunteers():
+    """Fetch all volunteers"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT Id, FirstName, LastName, Email, Phone
+            FROM volunteer
+            ORDER BY FirstName, LastName;
+        """)
+        volunteers = cursor.fetchall()
+        return volunteers
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.get("/volunteers/{volunteer_id}")
+def get_volunteer(volunteer_id: int):
+    """Fetch a single volunteer with their event assignments"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT Id, FirstName, LastName, Email, Phone
+            FROM volunteer
+            WHERE Id = %s;
+        """, (volunteer_id,))
+        volunteer = cursor.fetchone()
+
+        if not volunteer:
+            raise HTTPException(status_code=404, detail="Volunteer not found")
+
+        # Get events they're assigned to
+        cursor.execute("""
+            SELECT DISTINCT e.Id, e.Description, e.Address
+            FROM event e
+            JOIN volunteer_log vl ON e.Id = vl.EventID
+            WHERE vl.VolunteerID = %s
+            ORDER BY e.Id;
+        """, (volunteer_id,))
+        events = cursor.fetchall()
+
+        volunteer['events'] = events
+        return volunteer
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.post("/volunteers")
+def create_volunteer(volunteer: VolunteerCreate):
+    """Create a new volunteer"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        cursor.execute("""
+            INSERT INTO volunteer (FirstName, LastName, Email, Phone)
+            VALUES (%s, %s, %s, %s);
+        """, (volunteer.FirstName, volunteer.LastName, volunteer.Email, volunteer.Phone))
+        cnx.commit()
+
+        volunteer_id = cursor.lastrowid
+        cursor.execute("""
+            SELECT Id, FirstName, LastName, Email, Phone
+            FROM volunteer
+            WHERE Id = %s;
+        """, (volunteer_id,))
+        new_volunteer = cursor.fetchone()
+
+        return new_volunteer
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.put("/volunteers/{volunteer_id}")
+def update_volunteer(volunteer_id: int, volunteer: VolunteerCreate):
+    """Update an existing volunteer"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if volunteer exists
+        cursor.execute("SELECT Id FROM volunteer WHERE Id = %s;", (volunteer_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Volunteer not found")
+
+        cursor.execute("""
+            UPDATE volunteer
+            SET FirstName = %s, LastName = %s, Email = %s, Phone = %s
+            WHERE Id = %s;
+        """, (volunteer.FirstName, volunteer.LastName, volunteer.Email, volunteer.Phone, volunteer_id))
+        cnx.commit()
+
+        cursor.execute("""
+            SELECT Id, FirstName, LastName, Email, Phone
+            FROM volunteer
+            WHERE Id = %s;
+        """, (volunteer_id,))
+        updated_volunteer = cursor.fetchone()
+
+        return updated_volunteer
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/volunteers/{volunteer_id}")
+def delete_volunteer(volunteer_id: int):
+    """Delete a volunteer and all their event assignments"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if volunteer exists
+        cursor.execute("SELECT Id FROM volunteer WHERE Id = %s;", (volunteer_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Volunteer not found")
+
+        # Delete event assignments first
+        cursor.execute("DELETE FROM volunteer_log WHERE VolunteerID = %s;", (volunteer_id,))
+
+        # Delete the volunteer
+        cursor.execute("DELETE FROM volunteer WHERE Id = %s;", (volunteer_id,))
+        cnx.commit()
+
+        return {"message": "Volunteer deleted successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+# Volunteer-to-Event assignment endpoints
+class VolunteerEventAssignment(BaseModel):
+    VolunteerID: int
+    EventID: int
+    StudentID: Optional[int] = None
+
+@app.post("/volunteers/assign")
+def assign_volunteer_to_event(assignment: VolunteerEventAssignment):
+    """Assign a volunteer to an event"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        # Check if already assigned
+        cursor.execute("""
+            SELECT * FROM volunteer_log
+            WHERE VolunteerID = %s AND EventID = %s;
+        """, (assignment.VolunteerID, assignment.EventID))
+
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Volunteer already assigned to this event")
+
+        # Insert assignment
+        cursor.execute("""
+            INSERT INTO volunteer_log (VolunteerID, EventID, StudentID)
+            VALUES (%s, %s, %s);
+        """, (assignment.VolunteerID, assignment.EventID, assignment.StudentID))
+        cnx.commit()
+
+        return {"message": "Volunteer assigned to event successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
+
+@app.delete("/volunteers/assign/{volunteer_id}/{event_id}")
+def unassign_volunteer_from_event(volunteer_id: int, event_id: int):
+    """Remove a volunteer from an event"""
+    try:
+        cnx = get_mysql_pool().get_connection()
+        cursor = cnx.cursor(dictionary=True)
+
+        cursor.execute("""
+            DELETE FROM volunteer_log
+            WHERE VolunteerID = %s AND EventID = %s;
+        """, (volunteer_id, event_id))
+        cnx.commit()
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Assignment not found")
+
+        return {"message": "Volunteer unassigned from event successfully"}
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+    finally:
+        if 'cnx' in locals() and cnx.is_connected():
+            cursor.close()
+            cnx.close()
 
 @app.get("/events", response_model=List[Event])
 def get_all_events():
