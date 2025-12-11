@@ -112,43 +112,66 @@ function CreateEventForm({ onEventCreated }) {
   };
 
   if (loading) {
-    return <div className="panel"><p>Loading...</p></div>;
+    return (
+      <div className="relative overflow-x-auto shadow-md sm:rounded-lg">
+        <div className="text-center py-8 bg-white dark:bg-gray-800">
+          <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="panel">
-      <h2>Create New Event</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="event-description">Description *</label>
+    <div className="relative overflow-x-auto shadow-md sm:rounded-lg">
+      {/* Header */}
+      <div className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
+        <h2 className="text-xl font-bold">Create New Event</h2>
+        <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+          Fill in the details to create a new event and register students
+        </p>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="p-5 bg-white dark:bg-gray-800 space-y-6">
+        <div>
+          <label htmlFor="event-description" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+            Description *
+          </label>
           <input
             type="text"
             id="event-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="e.g., Summer Retreat 2024"
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
             required
           />
         </div>
 
-        <div className="form-group">
-          <label htmlFor="event-address">Address *</label>
+        <div>
+          <label htmlFor="event-address" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+            Address *
+          </label>
           <input
             type="text"
             id="event-address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="e.g., 123 Camp Road, Santa Barbara, CA"
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
             required
           />
         </div>
 
-        <div className="form-group">
-          <label htmlFor="event-type">Event Type</label>
+        <div>
+          <label htmlFor="event-type" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+            Event Type
+          </label>
           <select
             id="event-type"
             value={eventTypeId}
             onChange={(e) => setEventTypeId(e.target.value)}
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
           >
             <option value="">-- Select Event Type (Optional) --</option>
             {eventTypes.map(type => (
@@ -158,42 +181,58 @@ function CreateEventForm({ onEventCreated }) {
             ))}
           </select>
           {eventTypes.length === 0 && (
-            <p className="help-text">No event types available. Create one first!</p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No event types available. Create one first!</p>
           )}
         </div>
 
-        <div className="form-group">
-          <label>Register Students</label>
-          <div className="student-checkbox-list">
+        <div>
+          <label className="block mb-3 text-sm font-medium text-gray-900 dark:text-white">
+            Register Students
+          </label>
+          <div className="space-y-2 max-h-64 overflow-y-auto p-4 bg-gray-50 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600">
             {students.length === 0 ? (
-              <p className="help-text">No students available</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">No students available</p>
             ) : (
               students.map(student => (
-                <label key={student.id} className="checkbox-label">
+                <label key={student.id} className="flex items-center space-x-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={selectedStudents.includes(student.id)}
                     onChange={() => toggleStudentSelection(student.id)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                   />
-                  {student.firstName} {student.lastName}
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-300">
+                    {student.firstName} {student.lastName}
+                  </span>
                 </label>
               ))
             )}
           </div>
-          <p className="help-text">
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             {selectedStudents.length} student(s) selected
           </p>
         </div>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Loading...' : 'Create Event'}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Creating...' : 'Create Event'}
         </button>
       </form>
 
+      {/* Status Message */}
       {status && (
-        <p className={`status-message ${isError ? 'error' : 'success'}`}>
-          {status}
-        </p>
+        <div className="p-5 bg-white dark:bg-gray-800 border-t dark:border-gray-700">
+          <div className={`p-4 text-sm rounded-lg ${
+            isError
+              ? 'text-red-800 bg-red-50 dark:bg-gray-700 dark:text-red-400'
+              : 'text-green-800 bg-green-50 dark:bg-gray-700 dark:text-green-400'
+          }`} role="alert">
+            {status}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import EventList from './components/EventList';
 import EventDetails from './components/EventDetails';
 import CreateEventTypeForm from './components/CreateEventTypeForm';
 import CreateEventForm from './components/CreateEventForm';
 import GraphQLDemo from './components/GraphQLDemo';
-import StudentList from './components/StudentList';
 import StudentManagement from './components/StudentManagement';
 import ParentManagement from './components/ParentManagement';
 import SmallGroupManagement from './components/SmallGroupManagement';
 import LeaderManagement from './components/LeaderManagement';
 import VolunteerManagement from './components/VolunteerManagement';
 import FunFeatures from './components/FunFeatures';
-import './App.css';
 
 const API_URL = 'http://localhost:8000';
 
 function App() {
   const [activeTab, setActiveTab] = useState('events');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [registrations, setRegistrations] = useState([]);
@@ -31,7 +32,7 @@ function App() {
   };
 
   useEffect(() => {
-    fetchEvents(); // Fetch events on initial load
+    fetchEvents();
   }, []);
 
   const fetchLiveAttendance = (eventId) => {
@@ -48,13 +49,11 @@ function App() {
     setSelectedEvent(event);
     setCheckInStatus('');
 
-    // Fetch registrations
     fetch(`${API_URL}/events/${event.Id}/registrations`)
       .then(response => response.json())
       .then(data => setRegistrations(data))
       .catch(error => console.error('Error fetching registrations:', error));
 
-    // Fetch live attendance status
     fetchLiveAttendance(event.Id);
   };
 
@@ -71,7 +70,6 @@ function App() {
       .then(data => {
         setCheckInStatus(`${data.status}`);
 
-        // Update the checked-in status locally
         setCheckedInStudents(prev => {
           const newSet = new Set(prev);
           if (data.status === 'CHECKED IN') {
@@ -101,10 +99,8 @@ function App() {
         return;
       }
 
-      // Remove from local state
       setEvents(prevEvents => prevEvents.filter(e => e.Id !== eventId));
 
-      // Clear selected event if it was deleted
       if (selectedEvent?.Id === eventId) {
         setSelectedEvent(null);
         setRegistrations([]);
@@ -117,83 +113,27 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <header>
-        <h1>🏫 Youth Group Management System</h1>
-        <p className="header-subtitle">Multi-Database Architecture with GraphQL</p>
-      </header>
+    <div className="dark">
+      <div className="bg-gray-900 min-h-screen">
+        <Navbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
 
-      {/* Navigation Tabs */}
-      <nav className="tabs">
-        <button
-          className={`tab ${activeTab === 'events' ? 'active' : ''}`}
-          onClick={() => setActiveTab('events')}
-        >
-          📅 Events & Check-In
-        </button>
-        <button
-          className={`tab ${activeTab === 'students' ? 'active' : ''}`}
-          onClick={() => setActiveTab('students')}
-        >
-          👨‍🎓 Student Management
-        </button>
-        <button
-          className={`tab ${activeTab === 'parents' ? 'active' : ''}`}
-          onClick={() => setActiveTab('parents')}
-        >
-          👨‍👩‍👧 Parent Management
-        </button>
-        <button
-          className={`tab ${activeTab === 'groups' ? 'active' : ''}`}
-          onClick={() => setActiveTab('groups')}
-        >
-          👥 Small Groups
-        </button>
-        <button
-          className={`tab ${activeTab === 'leaders' ? 'active' : ''}`}
-          onClick={() => setActiveTab('leaders')}
-        >
-          🎓 Leaders
-        </button>
-        <button
-          className={`tab ${activeTab === 'volunteers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('volunteers')}
-        >
-          🤝 Volunteers
-        </button>
-        <button
-          className={`tab ${activeTab === 'fun' ? 'active' : ''}`}
-          onClick={() => setActiveTab('fun')}
-        >
-          🎉 Fun Features
-        </button>
-        <button
-          className={`tab ${activeTab === 'graphql' ? 'active' : ''}`}
-          onClick={() => setActiveTab('graphql')}
-        >
-          🚀 GraphQL Demo
-        </button>
-        <button
-          className={`tab ${activeTab === 'manage' ? 'active' : ''}`}
-          onClick={() => setActiveTab('manage')}
-        >
-          ⚙️ Manage
-        </button>
-      </nav>
-
-      {/* Tab Content */}
-      <main className="main-layout">
-        {activeTab === 'events' && (
-          <>
-            <div className="column">
+        {/* Main Content */}
+        <div className="p-4 sm:ml-64 mt-14">
+          <div className="p-4">
+          {activeTab === 'events' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <EventList
                 events={events}
                 selectedEvent={selectedEvent}
                 onEventSelect={handleEventSelect}
                 onEventDelete={handleEventDelete}
               />
-            </div>
-            <div className="column">
               <EventDetails
                 event={selectedEvent}
                 registrations={registrations}
@@ -202,78 +142,25 @@ function App() {
                 checkedInStudents={checkedInStudents}
               />
             </div>
-          </>
-        )}
+          )}
 
-        {activeTab === 'students' && (
-          <div className="column-full">
-            <StudentManagement />
-          </div>
-        )}
+          {activeTab === 'students' && <StudentManagement />}
+          {activeTab === 'parents' && <ParentManagement />}
+          {activeTab === 'groups' && <SmallGroupManagement />}
+          {activeTab === 'leaders' && <LeaderManagement />}
+          {activeTab === 'volunteers' && <VolunteerManagement />}
+          {activeTab === 'fun' && <FunFeatures />}
+          {activeTab === 'graphql' && <GraphQLDemo />}
 
-        {activeTab === 'parents' && (
-          <div className="column-full">
-            <ParentManagement />
-          </div>
-        )}
-
-        {activeTab === 'groups' && (
-          <div className="column-full">
-            <SmallGroupManagement />
-          </div>
-        )}
-
-        {activeTab === 'leaders' && (
-          <div className="column-full">
-            <LeaderManagement />
-          </div>
-        )}
-
-        {activeTab === 'volunteers' && (
-          <div className="column-full">
-            <VolunteerManagement />
-          </div>
-        )}
-
-        {activeTab === 'fun' && (
-          <div className="column-full">
-            <FunFeatures />
-          </div>
-        )}
-
-        {activeTab === 'graphql' && (
-          <div className="column-full">
-            <GraphQLDemo />
-          </div>
-        )}
-
-        {activeTab === 'manage' && (
-          <>
-            <div className="column">
+          {activeTab === 'manage' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <CreateEventForm onEventCreated={handleEventCreated} />
-            </div>
-            <div className="column">
               <CreateEventTypeForm />
             </div>
-          </>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="footer">
-        <p>
-          <strong>Tech Stack:</strong> React + Vite | FastAPI + GraphQL | MySQL + MongoDB + Redis
-        </p>
-        <p className="footer-links">
-          <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer">
-            REST API Docs
-          </a>
-          {' | '}
-          <a href="http://localhost:8000/graphql" target="_blank" rel="noopener noreferrer">
-            GraphiQL Interface
-          </a>
-        </p>
-      </footer>
+          )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
