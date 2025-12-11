@@ -123,8 +123,20 @@ class StudentCreate(BaseModel):
     LastName: Optional[str] = None
     Grade: str
 
+class StudentUpdate(BaseModel):
+    FirstName: str
+    LastName: Optional[str] = None
+    Grade: str
+
 # Parent Management Models
 class ParentCreate(BaseModel):
+    FirstName: str
+    LastName: Optional[str] = None
+    Relationship: str
+    Email: Optional[str] = None
+    Phone: str
+
+class ParentUpdate(BaseModel):
     FirstName: str
     LastName: Optional[str] = None
     Relationship: str
@@ -1625,8 +1637,6 @@ def finalize_attendance(event_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finalizing attendance: {e}")
 
-<<<<<<< HEAD
-
 # --- Student Registration Endpoints ---
 class RegistrationCreate(BaseModel):
     EventID: int
@@ -1701,7 +1711,7 @@ graphql_app = GraphQLRouter(schema, graphiql=True)
 # Mount the GraphQL endpoint at /graphql
 # All GraphQL queries and mutations will be sent to this endpoint
 app.include_router(graphql_app, prefix="/graphql")
-=======
+
 @app.get("/redis/events/{event_id}/random-winner", response_model=RandomWinnerResponse, tags=["Redis Attendance"])
 def get_random_event_winner(event_id: int):
     try:
@@ -1793,4 +1803,3 @@ def get_monthly_leaderboard(month: str, limit: int = 3):
         raise HTTPException(status_code=500, detail=f"Database error (MongoDB): {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching monthly leaderboard: {e}")
->>>>>>> origin/main
