@@ -1,7 +1,15 @@
+# Redis Setup - Handles the Live Check-In/Check-Out System
+# Redis is an in-memory database that's SUPER fast - perfect for real-time operations
+# We use it during events to track who's checked in without slowing down MySQL
+# Think of Redis as our "scratch pad" during an event, then we save to MySQL at the end
+
 from database import get_redis_conn, get_mysql_pool, close_connections
 from datetime import datetime
 import mysql.connector
 
+# This function toggles a student's check-in status
+# If they're already checked in, it checks them out (and vice versa)
+# Perfect for when a student scans their QR code at the door
 def student_checkin_edit(event_id: int, student_id: int):
     """
     Check in or out a student for an event.
@@ -16,21 +24,27 @@ def student_checkin_edit(event_id: int, student_id: int):
     r = get_redis_conn()
     now = datetime.utcnow().isoformat(timespec="seconds")
 
-    # Redis keys
+    # We use multiple Redis keys per event to store different pieces of data
+    # - checkedIn: a Set of student IDs currently at the event
+    # - checkInTimes: a Hash mapping student ID to when they arrived
+    # - checkOutTimes: a Hash mapping student ID to when they left
     checked_in_key = f"event:{event_id}:checkedIn"
     checkin_times_key = f"event:{event_id}:checkInTimes"
     checkout_times_key = f"event:{event_id}:checkOutTimes"
 
-    # Convert student_id to string for Redis storage
+    # Redis stores everything as strings, so we convert the student ID
     student_id_str = str(student_id)
 
+    # Check if this student is already in the "currently checked in" set
     is_checked_in = r.sismember(checked_in_key, student_id_str)
 
     if is_checked_in:
+        # Student is leaving - remove from active set and log checkout time
         r.srem(checked_in_key, student_id_str)
         r.hset(checkout_times_key, student_id_str, now)
         return "CHECKED OUT"
     else:
+        # Student is arriving - add to active set, log checkin time, clear any old checkout
         r.sadd(checked_in_key, student_id_str)
         r.hset(checkin_times_key, student_id_str, now)
         r.hdel(checkout_times_key, student_id_str)
@@ -50,17 +64,16 @@ def get_live_attendance(event_id: int) -> dict:
     checked_in_key = f"event:{event_id}:checkedIn"
     checkin_times_key = f"event:{event_id}:checkInTimes"
 
-    # Get the current checked-in students and their check-in times
+    # Use pipeline for efficiency - batches 3 Redis commands into 1 round trip
     pipe = r.pipeline()
-    pipe.scard(checked_in_key)
-    pipe.smembers(checked_in_key)
-    pipe.hgetall(checkin_times_key)
+    pipe.scard(checked_in_key)  # count of checked-in students
+    pipe.smembers(checked_in_key)  # set of student IDs
+    pipe.hgetall(checkin_times_key)  # hash of ID -> timestamp
 
-    # Retrieve the results
     count, members, times = pipe.execute()
     current_members = [m for m in members]
 
-    # Format the results for the API response
+    # Build response list with student IDs and their check-in timestamps
     status_list = []
     for student_id in current_members:
         status_list.append({"student_id": int(student_id), "check_in_time": times.get(student_id, "N/A")})
@@ -85,19 +98,19 @@ def finalize_event_attendance(event_id: int) -> dict:
     """
     r = get_redis_conn()
 
-    # Redis keys
+    # Same key structure as check-in/out functions
     checked_in_key = f"event:{event_id}:checkedIn"
     checkin_times_key = f"event:{event_id}:checkInTimes"
     checkout_times_key = f"event:{event_id}:checkOutTimes"
 
-    # Get all data from Redis
+    # Pull all attendance data from Redis in one pipeline
     pipe = r.pipeline()
-    pipe.smembers(checked_in_key)  # Currently checked in
-    pipe.hgetall(checkin_times_key)  # All check-in times
-    pipe.hgetall(checkout_times_key)  # All check-out times
+    pipe.smembers(checked_in_key)  # who's still here
+    pipe.hgetall(checkin_times_key)  # when everyone arrived
+    pipe.hgetall(checkout_times_key)  # when people left (if they did)
     currently_checked_in, checkin_times, checkout_times = pipe.execute()
 
-    # Combine all student IDs who ever checked in
+    # Get everyone who checked in at some point (not just who's currently here)
     all_student_ids = set(checkin_times.keys())
 
     if not all_student_ids:
@@ -109,25 +122,26 @@ def finalize_event_attendance(event_id: int) -> dict:
             "message": "No attendance data found for this event"
         }
 
-    # Prepare records for MySQL
+    # Build list of tuples for batch insert into MySQL
     attendance_records = []
     for student_id_str in all_student_ids:
         student_id = int(student_id_str)
         checkin_time = checkin_times.get(student_id_str)
-        checkout_time = checkout_times.get(student_id_str)
+        checkout_time = checkout_times.get(student_id_str)  # might be None if still at event
 
-        # Convert ISO format strings to datetime objects for MySQL
+        # MySQL needs datetime objects, not ISO strings
         checkin_dt = datetime.fromisoformat(checkin_time) if checkin_time else None
         checkout_dt = datetime.fromisoformat(checkout_time) if checkout_time else None
 
         attendance_records.append((event_id, student_id, checkin_dt, checkout_dt))
 
-    # Write to MySQL
+    # Transfer all records to MySQL's event_attendance table
     cnx = None
     try:
         cnx = get_mysql_pool().get_connection()
         cursor = cnx.cursor()
 
+        # executemany is more efficient than looping individual inserts
         insert_sql = """
             INSERT INTO event_attendance (EventID, StudentID, CheckInTime, CheckOutTime)
             VALUES (%s, %s, %s, %s)
@@ -138,7 +152,7 @@ def finalize_event_attendance(event_id: int) -> dict:
 
         records_inserted = cursor.rowcount
 
-        # Delete Redis keys only after successful MySQL write
+        # Only clear Redis after confirming MySQL write succeeded
         r.delete(checked_in_key, checkin_times_key, checkout_times_key)
 
         return {

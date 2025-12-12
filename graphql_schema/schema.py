@@ -139,10 +139,11 @@ class EventCreateInput:
 
 
 # --- Resolver Functions ---
-# These functions fetch data from your databases
+# These are the functions that actually fetch data when a GraphQL query is made
+# They connect to MySQL/MongoDB/Redis and convert the data into GraphQL types
 
 def get_all_students_resolver() -> List[Student]:
-    """Resolver to fetch all students from MySQL."""
+    """Fetches all students from MySQL and converts to GraphQL Student objects."""
     try:
         cnx = get_mysql_pool().get_connection()
         cursor = cnx.cursor(dictionary=True)

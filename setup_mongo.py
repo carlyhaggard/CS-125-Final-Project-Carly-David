@@ -1,8 +1,14 @@
+# MongoDB Setup - Handles Flexible Event Type Schemas
+# MongoDB is perfect for storing custom fields because it's schema-less
+# MySQL stores the event type ID/name, MongoDB stores the flexible field definitions
+# Example: One event type might have "theme" and "age_range", another might have "location_type"
+
 from database import get_mongo_db, close_connections
 from datetime import datetime
 from typing import Optional, List, Dict
 
 # --- Event Type Operations ---
+# These functions manage the schemas (field definitions) for different event types
 
 def create_event_type_schema(type_id: int, name: str, description: Optional[str], fields: List[Dict]) -> dict:
     """
@@ -15,9 +21,12 @@ def create_event_type_schema(type_id: int, name: str, description: Optional[str]
         fields: List of custom field definitions, e.g., [{"name": "age", "type": "number", "required": True}]
 
     Returns:
-        The inserted document
+        The inserted document or None if MongoDB is unavailable
     """
     db = get_mongo_db()
+    if db is None:
+        print("MongoDB is unavailable. Skipping event type schema creation.")
+        return None
     schema_doc = {
         "typeId": type_id,
         "name": name,
@@ -38,9 +47,11 @@ def get_event_type_schema(type_id: int) -> Optional[dict]:
         type_id: The ID from MySQL event_type table
 
     Returns:
-        The schema document or None if not found
+        The schema document or None if not found or MongoDB unavailable
     """
     db = get_mongo_db()
+    if db is None:
+        return None
     schema = db.eventTypes.find_one({"typeId": type_id})
     if schema and "_id" in schema:
         schema["_id"] = str(schema["_id"])
@@ -51,9 +62,11 @@ def get_all_event_type_schemas() -> List[dict]:
     Retrieves all event type schemas.
 
     Returns:
-        List of schema documents
+        List of schema documents or empty list if MongoDB unavailable
     """
     db = get_mongo_db()
+    if db is None:
+        return []
     schemas = list(db.eventTypes.find())
     for schema in schemas:
         if "_id" in schema:
@@ -73,9 +86,11 @@ def update_event_type_schema(type_id: int, name: Optional[str] = None,
         fields: Optional new field definitions
 
     Returns:
-        True if update was successful, False otherwise
+        True if update was successful, False if MongoDB unavailable or update failed
     """
     db = get_mongo_db()
+    if db is None:
+        return False
     update_doc = {"updatedAt": datetime.utcnow().isoformat()}
 
     if name is not None:
@@ -106,6 +121,8 @@ def delete_event_type_schema(type_id: int) -> bool:
     return result.deleted_count > 0
 
 # --- Per-Event Custom Field Operations ---
+# Event type schemas define WHAT fields exist (e.g., "theme" is a string)
+# Event custom data stores the ACTUAL values for a specific event (e.g., "theme": "80s Night")
 
 def store_event_custom_data(event_id: int, custom_data: Dict) -> dict:
     """
@@ -116,9 +133,12 @@ def store_event_custom_data(event_id: int, custom_data: Dict) -> dict:
         custom_data: Dictionary of custom field values
 
     Returns:
-        The inserted document
+        The inserted document or None if MongoDB is unavailable
     """
     db = get_mongo_db()
+    if db is None:
+        print("MongoDB is unavailable. Skipping event custom data storage.")
+        return None
     event_doc = {
         "eventId": event_id,
         "customData": custom_data,
@@ -137,9 +157,11 @@ def get_event_custom_data(event_id: int) -> Optional[dict]:
         event_id: The ID from MySQL event table
 
     Returns:
-        The custom data document or None if not found
+        The custom data document or None if not found or MongoDB unavailable
     """
     db = get_mongo_db()
+    if db is None:
+        return None
     event_doc = db.eventCustomData.find_one({"eventId": event_id})
     if event_doc and "_id" in event_doc:
         event_doc["_id"] = str(event_doc["_id"])
@@ -154,9 +176,11 @@ def update_event_custom_data(event_id: int, custom_data: Dict) -> bool:
         custom_data: New dictionary of custom field values
 
     Returns:
-        True if update was successful, False otherwise
+        True if update was successful, False if MongoDB unavailable or update failed
     """
     db = get_mongo_db()
+    if db is None:
+        return False
     result = db.eventCustomData.update_one(
         {"eventId": event_id},
         {
@@ -186,15 +210,16 @@ def delete_event_custom_data(event_id: int) -> bool:
 
 def setup_mongo_indexes():
     """
-    Creates indexes on MongoDB collections for better query performance.
+    Creates indexes for faster queries on typeId and eventId.
+    Unique indexes ensure we don't accidentally create duplicate schemas/data.
     """
     db = get_mongo_db()
 
-    # Index on eventTypes collection
+    # Index on typeId lets us quickly find schemas by event type
     db.eventTypes.create_index("typeId", unique=True)
     print("Created unique index on eventTypes.typeId")
 
-    # Index on eventCustomData collection
+    # Index on eventId lets us quickly find custom data by event
     db.eventCustomData.create_index("eventId", unique=True)
     print("Created unique index on eventCustomData.eventId")
 

@@ -1,28 +1,33 @@
-import mysql.connector
-from database import get_mysql_pool, get_mongo_db
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Optional, List, Dict
-from datetime import date, datetime
+# All the imports we need to make the API work
+import mysql.connector  # connects to our MySQL database
+from database import get_mysql_pool, get_mongo_db  # helper functions to get database connections
+from fastapi import FastAPI, HTTPException  # FastAPI is the web framework, HTTPException for errors
+from pydantic import BaseModel  # helps us validate incoming data with type checking
+from typing import Optional, List, Dict  # type hints for better code clarity
+from datetime import date, datetime  # for working with dates and times
+# Redis functions - these handle the live check-in/check-out system during events
 from setup_redis import (
-    student_checkin_edit,
-    get_live_attendance,
-    finalize_event_attendance,
-    get_random_winner
+    student_checkin_edit,  # toggles a student's check-in status
+    get_live_attendance,  # grabs current attendance from Redis
+    finalize_event_attendance,  # moves attendance from Redis to MySQL when event ends
+    get_random_winner  # picks a random checked-in student
 )
+# MongoDB functions - these handle flexible event type schemas and custom data
 from setup_mongo import (
-    create_event_type_schema,
-    get_event_type_schema,
-    get_all_event_type_schemas,
-    update_event_type_schema,
-    store_event_custom_data,
-    get_event_custom_data,
-    update_event_custom_data
+    create_event_type_schema,  # creates a new event type with custom fields
+    get_event_type_schema,  # retrieves an event type schema
+    get_all_event_type_schemas,  # gets all event type schemas
+    update_event_type_schema,  # updates an existing event type
+    store_event_custom_data,  # saves custom event data in MongoDB
+    get_event_custom_data,  # retrieves custom event data
+    update_event_custom_data  # updates custom event data
 )
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware  # allows our frontend to talk to the API
+from contextlib import asynccontextmanager  # helps manage startup/shutdown tasks
 
 # --- Diagnostic Function ---
+# This runs when the API starts up to make sure our database is accessible
+# Basically a health check to catch problems early instead of during a test/demo
 def check_database_tables():
     print("--- Running Database Diagnostic Check ---")
     try:
@@ -1204,6 +1209,10 @@ def get_top_attended_events():
             cursor.close()
             cnx.close()
 
+# --- Event Creation with Multi-Database Support ---
+# This endpoint demonstrates how we use multiple databases together
+# MySQL stores the core event data (description, address, type)
+# MongoDB stores flexible custom fields (like "theme", "attendance goal", etc.)
 @app.post("/events")
 def create_event(payload: EventCreate):
     """
@@ -1319,6 +1328,10 @@ def get_event_registrations(event_id: int):
             cursor.close()
             cnx.close()
 
+# --- MULTI-DATABASE INTEGRATION SHOWCASE ---
+# This endpoint is the coolest part of our project - it combines data from all 3 databases!
+# MySQL has the structured event info, MongoDB has flexible custom fields,
+# and Redis has the real-time attendance. All in one response.
 @app.get("/events/{event_id}/full-summary", tags=["Events", "MongoDB", "Redis"])
 def get_event_full_summary(event_id: int):
     """
@@ -1432,19 +1445,24 @@ def create_event_type(payload: EventTypeCreate):
     if event_type_id:
         try:
             mongo_db = get_mongo_db()
-            schema_doc = {
-                "typeId": event_type_id,
-                "name": payload.name,
-                "description": payload.description,
-                "fields": payload.custom_fields,
-                "createdAt": datetime.utcnow().isoformat()
-            }
-            mongo_db.eventTypes.insert_one(schema_doc)
+            if mongo_db is not None:
+                schema_doc = {
+                    "typeId": event_type_id,
+                    "name": payload.name,
+                    "description": payload.description,
+                    "fields": payload.custom_fields,
+                    "createdAt": datetime.utcnow().isoformat()
+                }
+                mongo_db.eventTypes.insert_one(schema_doc)
+            else:
+                print(f"MongoDB unavailable - event type {event_type_id} created in MySQL only (custom fields not stored)")
         except ConnectionError as e:
             # This will now catch the MongoDB connection error
-            raise HTTPException(status_code=500, detail=f"Database error (MongoDB): {e}")
+            print(f"MongoDB connection error for event type {event_type_id}: {e}")
+            # Don't raise - allow creation to succeed in MySQL
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred with MongoDB: {e}")
+            print(f"MongoDB error for event type {event_type_id}: {e}")
+            # Don't raise - allow creation to succeed in MySQL
 
     return {
         "id": event_type_id,
@@ -1588,6 +1606,10 @@ def get_event_custom_fields(event_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching custom fields: {e}")
 
+# --- Redis Live Attendance System ---
+# These endpoints use Redis to track who's checked in during an event in real-time
+# Redis is super fast so checking in/out hundreds of students is no problem
+# When the event is over, we call finalize to move everything to MySQL permanently
 @app.get("/redis/events/{event_id}/attendance", tags=["Redis Attendance"])
 def get_event_attendance(event_id: int):
     """
@@ -1607,6 +1629,8 @@ def get_event_attendance(event_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching attendance: {e}")
 
+# This endpoint is a toggle - if the student is already checked in, it checks them out
+# Otherwise it checks them in. Perfect for QR code scanners at the door
 @app.post("/redis/events/{event_id}/checkin", tags=["Redis Attendance"])
 def event_checkin(event_id: int, action: CheckInAction):
     """
@@ -1627,6 +1651,9 @@ def event_checkin(event_id: int, action: CheckInAction):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking in student: {e}")
 
+# IMPORTANT: This endpoint moves data from Redis (temporary) to MySQL (permanent)
+# Call this when the event is over to save the final attendance record
+# Redis data gets deleted after this, so only call it once at the end!
 @app.post("/events/{event_id}/finalize-attendance", tags=["Events", "Redis Attendance"])
 def finalize_attendance(event_id: int):
     """
